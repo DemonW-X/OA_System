@@ -1,0 +1,182 @@
+package handlers
+
+import (
+	"net/http"
+	"oa-system/database"
+	"oa-system/models"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+type ResignationRequest struct {
+	EmployeeID int    `json:"employee_id" binding:"required"`
+	ResignDate string `json:"resign_date" binding:"required"` // yyyy-MM-dd
+	Reason     string `json:"reason"`
+	Remark     string `json:"remark"`
+}
+
+func GetResignations(c *gin.Context) {
+	var list []models.Resignation
+	query := database.DB.Model(&models.Resignation{}).Preload("Employee").Preload("Employee.Department").Preload("Employee.PositionInfo")
+
+	if empID := c.Query("employee_id"); empID != "" {
+		query = query.Where("employee_id = ?", empID)
+	}
+
+	var total int64
+	query.Count(&total)
+	page, pageSize, offset := getPagination(c)
+	query.Order("resign_date desc, id desc").Offset(offset).Limit(pageSize).Find(&list)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
+	})
+	writeLog(c, "离职管理", "查询", "查询离职列表")
+}
+
+func GetResignation(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var item models.Resignation
+	if err := database.DB.Preload("Employee").Preload("Employee.Department").Preload("Employee.PositionInfo").First(&item, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "离职记录不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
+}
+
+func CreateResignation(c *gin.Context) {
+	var req ResignationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
+		return
+	}
+	resignDate, err := time.ParseInLocation(dateLayout, req.ResignDate, time.Local)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "离职日期格式错误，请使用 yyyy-MM-dd"})
+		return
+	}
+
+	var emp models.Employee
+	if err := database.DB.First(&emp, "id = ?", req.EmployeeID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "员工不存在"})
+		return
+	}
+
+	tx := database.DB.Begin()
+	item := models.Resignation{
+		EmployeeID: req.EmployeeID,
+		ResignDate: resignDate,
+		Reason:     req.Reason,
+		Remark:     req.Remark,
+	}
+	if err := tx.Create(&item).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建失败: " + err.Error()})
+		return
+	}
+
+	if err := tx.Model(&models.Employee{}).Where("id = ?", req.EmployeeID).Update("status", 0).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新员工状态失败"})
+		return
+	}
+
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
+	writeLog(c, "离职管理", "新增", "新增离职记录")
+}
+
+func UpdateResignation(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var item models.Resignation
+	if err := database.DB.First(&item, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "离职记录不存在"})
+		return
+	}
+
+	var req ResignationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
+		return
+	}
+	resignDate, err := time.ParseInLocation(dateLayout, req.ResignDate, time.Local)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "离职日期格式错误，请使用 yyyy-MM-dd"})
+		return
+	}
+
+	var emp models.Employee
+	if err := database.DB.First(&emp, "id = ?", req.EmployeeID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "员工不存在"})
+		return
+	}
+
+	tx := database.DB.Begin()
+	item.EmployeeID = req.EmployeeID
+	item.ResignDate = resignDate
+	item.Reason = req.Reason
+	item.Remark = req.Remark
+	if err := tx.Save(&item).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败"})
+		return
+	}
+
+	if err := tx.Model(&models.Employee{}).Where("id = ?", req.EmployeeID).Update("status", 0).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新员工状态失败"})
+		return
+	}
+
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
+	writeLog(c, "离职管理", "修改", "修改离职记录")
+}
+
+func DeleteResignation(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var item models.Resignation
+	if err := database.DB.First(&item, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "离职记录不存在"})
+		return
+	}
+
+	tx := database.DB.Begin()
+	empID := item.EmployeeID
+	if err := tx.Delete(&item).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "删除失败"})
+		return
+	}
+
+	var count int64
+	if err := tx.Model(&models.Resignation{}).Where("employee_id = ?", empID).Count(&count).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "校验失败"})
+		return
+	}
+	if count == 0 {
+		if err := tx.Model(&models.Employee{}).Where("id = ?", empID).Update("status", 1).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "恢复员工状态失败"})
+			return
+		}
+	}
+
+	tx.Commit()
+	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
+	writeLog(c, "离职管理", "删除", "删除离职记录")
+}

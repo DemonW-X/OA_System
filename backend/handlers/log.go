@@ -1,0 +1,23 @@
+package handlers
+
+import (
+	"oa-system/database"
+	"oa-system/models"
+
+	"github.com/gin-gonic/gin"
+)
+
+func writeLog(c *gin.Context, module, action, remark string) {
+	log := models.OperationLog{
+		UserID:     c.GetInt("userID"),
+		Username:   c.GetString("username"),
+		Module:     module,
+		Action:     action,
+		Method:     c.Request.Method,
+		Path:       c.Request.URL.Path,
+		StatusCode: c.Writer.Status(),
+		IP:         c.ClientIP(),
+		Remark:     remark,
+	}
+	database.DB.Create(&log)
+}
