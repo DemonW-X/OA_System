@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"oa-system/database"
 	"oa-system/models"
@@ -193,6 +194,115 @@ func GetOrchidWorkflowHistories(c *gin.Context) {
 		"histories": allHistories,
 		"tasks":     tasks,
 	}})
+}
+
+type PendingApprovalItem struct {
+	TaskID      int    `json:"task_id"`
+	BizType     string `json:"biz_type"`
+	BizID       int    `json:"biz_id"`
+	NodeKey     string `json:"node_key"`
+	Title       string `json:"title"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
+	DetailPath  string `json:"detail_path"`
+	InstanceID  int    `json:"instance_id"`
+}
+
+func buildApprovalTitle(ins models.OrchidWorkflowInstance) string {
+	switch ins.BizType {
+	case "employee":
+		var emp models.Employee
+		if err := database.DB.First(&emp, ins.BizID).Error; err == nil {
+			return fmt.Sprintf("员工入职：%s", emp.Name)
+		}
+	case "leave_request":
+		var leave models.LeaveRequest
+		if err := database.DB.Preload("Employee").First(&leave, ins.BizID).Error; err == nil {
+			if leave.Employee != nil && leave.Employee.Name != "" {
+				return fmt.Sprintf("请假申请：%s（%s）", leave.Employee.Name, leave.Type)
+			}
+			return fmt.Sprintf("请假申请：#%d", leave.ID)
+		}
+	case "event_booking":
+		var booking models.EventBooking
+		if err := database.DB.First(&booking, ins.BizID).Error; err == nil {
+			return fmt.Sprintf("事件预定：%s", booking.Title)
+		}
+	}
+	return fmt.Sprintf("%s #%d", ins.BizType, ins.BizID)
+}
+
+func buildApprovalDetailPath(bizType string, bizID int) string {
+	switch bizType {
+	case "employee":
+		return fmt.Sprintf("/employee?id=%d", bizID)
+	case "leave_request":
+		return fmt.Sprintf("/leave-request?id=%d", bizID)
+	case "event_booking":
+		return fmt.Sprintf("/event-booking?id=%d", bizID)
+	default:
+		return "/dashboard"
+	}
+}
+
+func GetMyPendingApprovals(c *gin.Context) {
+	userID := c.GetInt("userID")
+	if userID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 1, "msg": "未登录"})
+		return
+	}
+
+	limit := atoiDefault(c.DefaultQuery("limit", "20"), 20)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var tasks []models.OrchidWorkflowTask
+	database.DB.Where("assignee_id = ? AND status = 'open'", userID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&tasks)
+
+	if len(tasks) == 0 {
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": []PendingApprovalItem{}})
+		return
+	}
+
+	instanceIDs := make([]int, 0, len(tasks))
+	for _, t := range tasks {
+		instanceIDs = append(instanceIDs, t.InstanceID)
+	}
+
+	var instances []models.OrchidWorkflowInstance
+	database.DB.Where("id IN ?", instanceIDs).Find(&instances)
+	insMap := map[int]models.OrchidWorkflowInstance{}
+	for _, ins := range instances {
+		insMap[ins.ID] = ins
+	}
+
+	items := make([]PendingApprovalItem, 0, len(tasks))
+	for _, t := range tasks {
+		ins, ok := insMap[t.InstanceID]
+		if !ok {
+			continue
+		}
+		items = append(items, PendingApprovalItem{
+			TaskID:     t.ID,
+			BizType:    ins.BizType,
+			BizID:      ins.BizID,
+			NodeKey:    t.NodeKey,
+			Title:      buildApprovalTitle(ins),
+			Status:     ins.Status,
+			CreatedAt:  t.CreatedAt.Format(timeLayout),
+			DetailPath: buildApprovalDetailPath(ins.BizType, ins.BizID),
+			InstanceID: ins.ID,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": items})
 }
 
 func TransferOrchidWorkflowTask(c *gin.Context) {

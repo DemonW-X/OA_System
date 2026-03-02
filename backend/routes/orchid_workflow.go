@@ -13,6 +13,7 @@ func orchidWorkflowRoutes(rg *gin.RouterGroup) {
 	rg.PUT("/orchid-workflows/:id", handlers.UpdateOrchidWorkflowDefinition)
 	rg.DELETE("/orchid-workflows/:id", handlers.DeleteOrchidWorkflowDefinition)
 	rg.GET("/orchid-workflow-histories", handlers.GetOrchidWorkflowHistories)
+	rg.GET("/approvals/pending", handlers.GetMyPendingApprovals)
 	rg.POST("/orchid-workflow-transfer", handlers.TransferOrchidWorkflowTask)
 	rg.POST("/orchid-workflow-skip", handlers.SkipOrchidWorkflowNode)
 	rg.POST("/orchid-workflow-seed", handlers.SeedOrchidWorkflowTemplates)

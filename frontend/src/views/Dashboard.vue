@@ -36,6 +36,28 @@
       </el-col>
     </el-row>
 
+    <!-- 待我审核 -->
+    <el-card shadow="hover" style="margin-top:20px">
+      <template #header>
+        <div style="display:flex;align-items:center;gap:8px">
+          <el-icon color="#E6A23C"><Bell /></el-icon>
+          <span style="font-weight:bold">待我审核</span>
+          <el-tag size="small" type="warning" style="margin-left:auto">{{ pendingApprovals.length }} 条</el-tag>
+        </div>
+      </template>
+      <el-empty v-if="pendingApprovals.length === 0" description="暂无待审核事项" :image-size="60" />
+      <el-table v-else :data="pendingApprovals" size="small" border>
+        <el-table-column prop="title" label="事项" min-width="260" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-link type="primary" @click="openApproval(row)">{{ row.title }}</el-link>
+          </template>
+        </el-table-column>
+        <el-table-column prop="biz_type" label="业务类型" width="120" />
+        <el-table-column prop="node_key" label="当前节点" width="120" />
+        <el-table-column prop="created_at" label="待办时间" width="180" />
+      </el-table>
+    </el-card>
+
     <!-- 公告栏 -->
     <el-card shadow="hover" style="margin-top:20px">
       <template #header>
@@ -72,13 +94,18 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Bell } from '@element-plus/icons-vue'
 import { getDepartments } from '../api/department'
 import { getEmployees } from '../api/employee'
 import { getNotices } from '../api/notice'
 import { getPositions } from '../api/position'
+import { getMyPendingApprovals } from '../api/orchid_workflow'
+
+const router = useRouter()
 
 const stats = ref({ departments: 0, positions: 0, employees: 0, notices: 0 })
+const pendingApprovals = ref([])
 const noticeList = ref([])
 const dialogVisible = ref(false)
 const currentNotice = ref({})
@@ -95,19 +122,26 @@ const openNotice = (item) => {
   dialogVisible.value = true
 }
 
+const openApproval = (item) => {
+  if (!item?.detail_path) return
+  router.push(item.detail_path)
+}
+
 onMounted(async () => {
-  const [d, p, e, n, notices] = await Promise.all([
+  const [d, p, e, n, notices, approvals] = await Promise.all([
     getDepartments({ page: 1, page_size: 1 }),
     getPositions({ page: 1, page_size: 1 }),
     getEmployees({ page: 1, page_size: 1 }),
     getNotices({ page: 1, page_size: 1 }),
-    getNotices({ page: 1, page_size: 10, status: 1 })
+    getNotices({ page: 1, page_size: 10, status: 1 }),
+    getMyPendingApprovals({ limit: 10 })
   ])
   stats.value.departments = d.data.data?.total || 0
   stats.value.positions   = p.data.data?.total || 0
   stats.value.employees   = e.data.data?.total || 0
   stats.value.notices     = n.data.data?.total || 0
   noticeList.value        = notices.data.data?.list || []
+  pendingApprovals.value  = approvals.data?.data || []
 })
 </script>
 
