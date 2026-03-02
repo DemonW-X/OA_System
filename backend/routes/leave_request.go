@@ -8,6 +8,7 @@ import (
 
 func leaveRequestRoutes(rg *gin.RouterGroup) {
 	rg.GET("/leave-requests", handlers.GetLeaveRequests)
+	rg.GET("/leave-requests/:id", handlers.GetLeaveRequest)
 	rg.POST("/leave-requests", handlers.CreateLeaveRequest)
 	rg.PUT("/leave-requests/:id", handlers.UpdateLeaveRequest)
 	rg.PUT("/leave-requests/:id/submit", handlers.SubmitLeaveRequest)

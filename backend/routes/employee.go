@@ -15,4 +15,5 @@ func employeeRoutes(rg *gin.RouterGroup) {
 	rg.PUT("/employees/:id/submit", handlers.SubmitEmployee)
 	rg.PUT("/employees/:id/withdraw", handlers.WithdrawEmployee)
 	rg.PUT("/employees/:id/approve", handlers.ApproveEmployee)
+	rg.PUT("/employees/:id/cancel-approve", handlers.CancelEmployeeApproval)
 }

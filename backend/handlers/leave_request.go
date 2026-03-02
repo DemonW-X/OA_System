@@ -79,6 +79,19 @@ func GetLeaveRequests(c *gin.Context) {
 	writeLog(c, "请假管理", "查询", "查询请假列表")
 }
 
+func GetLeaveRequest(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var leave models.LeaveRequest
+	if err := database.DB.Preload("Employee").First(&leave, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "请假记录不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": leave})
+}
+
 func CreateLeaveRequest(c *gin.Context) {
 	var req LeaveRequestCreate
 	if err := c.ShouldBindJSON(&req); err != nil {

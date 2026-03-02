@@ -61,14 +61,15 @@
       </el-table-column>
       <el-table-column label="操作" width="160">
         <template #default="{ row }">
-          <el-button size="small" :disabled="!isDraft(row)" @click="openDialog(row)">编辑</el-button>
-          <el-button size="small" type="danger" :disabled="!isDraft(row)" @click="handleDelete(row.id)">删除</el-button>
+          <el-button size="small" :disabled="!isEditable(row)" @click="openDialog(row)">编辑</el-button>
+          <el-button size="small" type="danger" :disabled="!isEditable(row)" @click="handleDelete(row.id)">删除</el-button>
         </template>
       </el-table-column>
-      <el-table-column label="审核" width="180">
+      <el-table-column label="审核" width="280">
         <template #default="{ row }">
-          <el-button size="small" type="success" :disabled="!isDraft(row)" @click="handleSubmitAudit(row)">提交审核</el-button>
+          <el-button size="small" type="success" :disabled="!isEditable(row)" @click="handleSubmitAudit(row)">提交审核</el-button>
           <el-button size="small" type="warning" :disabled="row.approve_status !== 'pending'" @click="handleWithdraw(row)">撤回</el-button>
+          <el-button size="small" type="info" :disabled="row.approve_status !== 'approved'" @click="handleCancelApprove(row)">弃审</el-button>
         </template>
       </el-table-column>
       <el-table-column label="查看记录" width="120">
@@ -135,7 +136,7 @@
       </el-descriptions>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="success" :disabled="!isDraft(detailData)" @click="handleSubmitAudit(detailData)">提交审核</el-button>
+        <el-button type="success" :disabled="!isEditable(detailData)" @click="handleSubmitAudit(detailData)">提交审核</el-button>
       </template>
     </el-dialog>
 
@@ -258,7 +259,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getEmployees, getEmployee, createEmployee, updateEmployee, deleteEmployee, submitEmployee, withdrawEmployee } from '../api/employee'
+import { getEmployees, getEmployee, createEmployee, updateEmployee, deleteEmployee, submitEmployee, withdrawEmployee, cancelApproveEmployee } from '../api/employee'
 import { getDepartments } from '../api/department'
 import { getPositions } from '../api/position'
 import { getOrchidWorkflowHistories } from '../api/orchid_workflow'
@@ -305,7 +306,7 @@ const rules = {
 
 const approveStatusLabel = (s) => ({ draft: '草稿', pending: '待审批', approved: '已通过', rejected: '已拒绝' }[s] || '待审批')
 const approveTagType = (s) => ({ draft: 'info', pending: 'warning', approved: 'success', rejected: 'danger' }[s] || 'warning')
-const isDraft = (row) => row?.approve_status === 'draft'
+const isEditable = (row) => ['draft', 'rejected'].includes(row?.approve_status)
 const seqNo = (idx) => (query.value.page - 1) * query.value.page_size + idx + 1
 
 const loadData = async () => {
@@ -387,6 +388,22 @@ const handleWithdraw = async (row) => {
     loadData()
   } catch (e) {
     ElMessage.error(e?.response?.data?.msg || '撤回失败，可能已有节点审批通过')
+  }
+}
+
+const handleCancelApprove = async (row) => {
+  if (!row?.id) return
+  await ElMessageBox.confirm('确认取消审核？操作后单据将恢复为草稿状态，且不对流程记录做任何处理。', '取消审核', { type: 'warning' })
+  try {
+    await cancelApproveEmployee(row.id)
+    ElMessage.success('已取消审核，单据状态恢复为草稿')
+    if (detailVisible.value && detailData.value?.id === row.id) {
+      const res = await getEmployee(row.id)
+      detailData.value = res.data.data
+    }
+    loadData()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || '取消审核失败')
   }
 }
 

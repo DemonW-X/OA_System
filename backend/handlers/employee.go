@@ -241,8 +241,8 @@ func SubmitEmployee(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "员工不存在"})
 		return
 	}
-	if emp.ApproveStatus != "draft" {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅草稿状态可提交审核"})
+	if emp.ApproveStatus != "draft" && emp.ApproveStatus != "rejected" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅草稿或已拒绝状态可提交审核"})
 		return
 	}
 
@@ -385,4 +385,33 @@ func ApproveEmployee(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": emp})
 	writeLog(c, "员工管理", "审批", action+"："+emp.Name)
+}
+
+// CancelEmployeeApproval 取消已通过审核（仅重置单据状态，不处理流程记录）
+func CancelEmployeeApproval(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var emp models.Employee
+	if err := database.DB.First(&emp, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "员工不存在"})
+		return
+	}
+	if emp.ApproveStatus != "approved" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅已通过状态可取消审核"})
+		return
+	}
+
+	emp.ApproveStatus = "draft"
+	emp.ApprovedBy = ""
+	emp.ApprovedAt = nil
+	emp.ApproveRemark = ""
+	if err := database.DB.Save(&emp).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "取消审核失败"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": emp, "msg": "已取消审核，状态恢复为草稿"})
+	writeLog(c, "员工管理", "取消审核", "取消审核（不变更流程记录）："+emp.Name)
 }

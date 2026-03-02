@@ -46,6 +46,19 @@ func GetEventBookings(c *gin.Context) {
 	writeLog(c, "事件预定", "查询", "查询事件预定列表")
 }
 
+func GetEventBooking(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var booking models.EventBooking
+	if err := database.DB.Preload("MeetingRoom").First(&booking, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "预定不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": booking})
+}
+
 func CreateEventBooking(c *gin.Context) {
 	var req EventBookingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
