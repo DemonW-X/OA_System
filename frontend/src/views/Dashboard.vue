@@ -36,45 +36,51 @@
       </el-col>
     </el-row>
 
-    <!-- 待我审核 -->
-    <el-card shadow="hover" style="margin-top:20px">
-      <template #header>
-        <div style="display:flex;align-items:center;gap:8px">
-          <el-icon color="#E6A23C"><Bell /></el-icon>
-          <span style="font-weight:bold">待我审核</span>
-          <el-tag size="small" type="warning" style="margin-left:auto">{{ pendingApprovals.length }} 条</el-tag>
-        </div>
-      </template>
-      <el-empty v-if="pendingApprovals.length === 0" description="暂无待审核事项" :image-size="60" />
-      <el-table v-else :data="pendingApprovals" size="small" border>
-        <el-table-column prop="title" label="事项" min-width="260" show-overflow-tooltip>
-          <template #default="{ row }">
-            <el-link type="primary" @click="openApproval(row)">{{ row.title }}</el-link>
+    <el-row :gutter="20" style="margin-top:20px">
+      <!-- 待我审核 -->
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <div style="display:flex;align-items:center;gap:8px">
+              <el-icon color="#E6A23C"><Bell /></el-icon>
+              <span style="font-weight:bold">待我审核</span>
+              <el-tag size="small" type="warning" style="margin-left:auto">{{ pendingApprovals.length }} 条</el-tag>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column prop="biz_type" label="业务类型" width="120" />
-        <el-table-column prop="node_key" label="当前节点" width="120" />
-        <el-table-column prop="created_at" label="待办时间" width="180" />
-      </el-table>
-    </el-card>
+          <el-empty v-if="pendingApprovals.length === 0" description="暂无待审核事项" :image-size="60" />
+          <el-table v-else :data="pendingApprovals" size="small" border>
+            <el-table-column prop="title" label="事项" min-width="260" show-overflow-tooltip>
+              <template #default="{ row }">
+                <el-link type="primary" @click="openApproval(row)">{{ row.title }}</el-link>
+              </template>
+            </el-table-column>
+            <el-table-column prop="biz_type" label="业务类型" width="120" />
+            <el-table-column prop="node_key" label="当前节点" width="120" />
+            <el-table-column prop="created_at" label="待办时间" width="180" />
+          </el-table>
+        </el-card>
+      </el-col>
 
-    <!-- 公告栏 -->
-    <el-card shadow="hover" style="margin-top:20px">
-      <template #header>
-        <div style="display:flex;align-items:center;gap:8px">
-          <el-icon color="#409EFF"><Bell /></el-icon>
-          <span style="font-weight:bold">公告栏</span>
-          <el-tag size="small" type="info" style="margin-left:auto">最新 {{ noticeList.length }} 条</el-tag>
-        </div>
-      </template>
-      <el-empty v-if="noticeList.length === 0" description="暂无公告" :image-size="60" />
-      <ul v-else class="notice-list">
-        <li v-for="item in noticeList" :key="item.id" class="notice-item">
-          <el-link type="primary" @click="openNotice(item)">{{ item.title }}</el-link>
-          <span class="notice-meta">{{ item.author }} · {{ formatDate(item.created_at) }}</span>
-        </li>
-      </ul>
-    </el-card>
+      <!-- 公告栏 -->
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <div style="display:flex;align-items:center;gap:8px">
+              <el-icon color="#409EFF"><Bell /></el-icon>
+              <span style="font-weight:bold">公告栏</span>
+              <el-tag size="small" type="info" style="margin-left:auto">最新 {{ noticeList.length }} 条</el-tag>
+            </div>
+          </template>
+          <el-empty v-if="noticeList.length === 0" description="暂无公告" :image-size="60" />
+          <ul v-else class="notice-list">
+            <li v-for="item in noticeList" :key="item.id" class="notice-item">
+              <el-link type="primary" @click="openNotice(item)">{{ item.title }}</el-link>
+              <span class="notice-meta">{{ item.author }} · {{ formatDate(item.created_at) }}</span>
+            </li>
+          </ul>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 公告详情弹窗 -->
     <el-dialog v-model="dialogVisible" width="600px" :title="currentNotice.title">
