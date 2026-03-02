@@ -9,11 +9,13 @@
         <el-input v-model="query.username" placeholder="请输入操作人" clearable />
       </el-form-item>
       <el-form-item label="模块">
-        <el-select v-model="query.module" placeholder="全部" clearable style="width:120px">
-          <el-option label="部门管理" value="部门管理" />
-          <el-option label="职位管理" value="职位管理" />
-          <el-option label="员工管理" value="员工管理" />
-          <el-option label="公告管理" value="公告管理" />
+        <el-select v-model="query.module" placeholder="全部" clearable style="width:140px">
+          <el-option
+            v-for="m in moduleOptions"
+            :key="m"
+            :label="m"
+            :value="m"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="操作类型">
@@ -70,10 +72,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getLogs } from '../api/log'
+import { getLogs, getLogModules } from '../api/log'
 
 const list = ref([])
 const total = ref(0)
+const moduleOptions = ref([])
 const query = ref({
   username: '', module: '', action: '',
   start_time: '', end_time: '',
@@ -99,11 +102,19 @@ const loadData = async () => {
   total.value = res.data.data.total || 0
 }
 
+const loadModules = async () => {
+  const res = await getLogModules()
+  moduleOptions.value = res.data?.data || []
+}
+
 const handleSearch = () => { query.value.page = 1; loadData() }
 const handleReset = () => {
   query.value = { username: '', module: '', action: '', start_time: '', end_time: '', page: 1, page_size: 10 }
   loadData()
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadModules()
+  loadData()
+})
 </script>

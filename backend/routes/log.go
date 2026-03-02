@@ -8,4 +8,5 @@ import (
 
 func logRoutes(rg *gin.RouterGroup) {
 	rg.GET("/logs", handlers.GetLogs)
+	rg.GET("/logs/modules", handlers.GetLogModules)
 }

@@ -39,3 +39,17 @@ func GetLogs(c *gin.Context) {
 		"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
 	})
 }
+
+func GetLogModules(c *gin.Context) {
+	var modules []string
+	database.DB.Model(&models.OperationLog{}).
+		Distinct("module").
+		Where("module IS NOT NULL AND module <> ''").
+		Order("module ASC").
+		Pluck("module", &modules)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"data": modules,
+	})
+}
