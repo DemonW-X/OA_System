@@ -61,6 +61,12 @@ func Login(c *gin.Context) {
 	})
 }
 
+func Logout(c *gin.Context) {
+	userID := c.GetInt("userID")
+	middleware.DeleteToken(userID)
+	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "已登出"})
+}
+
 func GetProfile(c *gin.Context) {
 	userID := c.GetInt("userID")
 	var user models.User

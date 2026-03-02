@@ -20,7 +20,7 @@ http.interceptors.request.use(config => {
 http.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && !err.config.url.includes('/login')) {
       localStorage.removeItem('token')
       localStorage.removeItem('userInfo')
       router.push('/login')

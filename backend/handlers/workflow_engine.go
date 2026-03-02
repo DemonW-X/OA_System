@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"oa-system/database"
@@ -15,6 +17,12 @@ import (
 
 	"github.com/kyodo-tech/orchid"
 )
+
+const workflowTimeout = 10 * time.Second
+
+func instanceLockKey(bizType string, bizID int) string {
+	return fmt.Sprintf("wf_lock:%s:%d", bizType, bizID)
+}
 
 type dagNodeApproval struct {
 	Approvers []int `json:"approvers"`
@@ -426,17 +434,49 @@ func createTasksForNode(insID int, wf *orchid.Workflow, nodeKey string) {
 	if isStartLikeNode(nodeKey, node) || isEndLikeNode(nodeKey, node) {
 		return
 	}
-	for _, uid := range resolveAssigneeUserIDs(node) {
-		_ = database.DB.Create(&models.OrchidWorkflowTask{
-			InstanceID: insID,
-			NodeKey:    nodeKey,
-			AssigneeID: uid,
-			Status:     "open",
-		}).Error
+	uids := resolveAssigneeUserIDs(node)
+	if len(uids) == 0 {
+		return
+	}
+
+	type result struct{ err error }
+	ch := make(chan result, len(uids))
+	var wg sync.WaitGroup
+
+	for _, uid := range uids {
+		wg.Add(1)
+		go func(assigneeID int) {
+			defer wg.Done()
+			err := database.DB.Create(&models.OrchidWorkflowTask{
+				InstanceID: insID,
+				NodeKey:    nodeKey,
+				AssigneeID: assigneeID,
+				Status:     "open",
+			}).Error
+			ch <- result{err: err}
+		}(uid)
+	}
+
+	wg.Wait()
+	close(ch)
+	for r := range ch {
+		if r.err != nil {
+			log.Printf("[createTasksForNode] insID=%d node=%s err=%v", insID, nodeKey, r.err)
+		}
 	}
 }
 
 func startOrchidInstance(bizType string, bizID int, operator string) (*models.OrchidWorkflowInstance, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), workflowTimeout)
+	defer cancel()
+
+	// 分布式锁，防止同一业务重复提交
+	release, err := database.AcquireLock(ctx, instanceLockKey(bizType, bizID))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	def, wf, condMap, err := loadOrchidWorkflowByBiz(bizType)
 	if err != nil {
 		return nil, err
@@ -612,6 +652,16 @@ func parseCurrentNodes(current string) []string {
 }
 
 func approveOrRejectInstance(bizType string, bizID int, operator, action, remark string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), workflowTimeout)
+	defer cancel()
+
+	// 分布式锁，防止并发审批同一实例
+	release, err := database.AcquireLock(ctx, instanceLockKey(bizType, bizID))
+	if err != nil {
+		return "", err
+	}
+	defer release()
+
 	ins, err := getInstanceByBiz(bizType, bizID)
 	if err != nil {
 		return "", err

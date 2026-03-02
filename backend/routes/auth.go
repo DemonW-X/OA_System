@@ -10,4 +10,5 @@ func authRoutes(rg *gin.RouterGroup) {
 	rg.GET("/profile", handlers.GetProfile)
 	rg.PUT("/profile", handlers.UpdateProfile)
 	rg.PUT("/profile/password", handlers.ChangePassword)
+	rg.POST("/logout", handlers.Logout)
 }

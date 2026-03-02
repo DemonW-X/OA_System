@@ -12,6 +12,7 @@ import (
 func main() {
 	config.Init()
 	database.InitDB()
+	database.InitRedis()
 
 	database.DB.AutoMigrate(
 		&models.User{},

@@ -1,15 +1,22 @@
 package middleware
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
+
+	"oa-system/database"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("oa-system-secret-key")
+var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+
+const tokenTTL = 24 * time.Hour
 
 type Claims struct {
 	UserID   int    `json:"user_id"`
@@ -19,6 +26,10 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+func redisTokenKey(userID int) string {
+	return fmt.Sprintf("token:%d", userID)
+}
+
 func GenerateToken(userID int, username, realName, role string) (string, error) {
 	claims := Claims{
 		UserID:   userID,
@@ -26,12 +37,18 @@ func GenerateToken(userID int, username, realName, role string) (string, error) 
 		RealName: realName,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	tokenStr, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", err
+	}
+	// 存入 Redis
+	database.RDB.Set(context.Background(), redisTokenKey(userID), tokenStr, tokenTTL)
+	return tokenStr, nil
 }
 
 func ParseToken(tokenStr string) (*Claims, error) {
@@ -47,6 +64,10 @@ func ParseToken(tokenStr string) (*Claims, error) {
 	return nil, jwt.ErrTokenInvalidClaims
 }
 
+func DeleteToken(userID int) {
+	database.RDB.Del(context.Background(), redisTokenKey(userID))
+}
+
 func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -55,9 +76,17 @@ func JWTAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		claims, err := ParseToken(strings.TrimPrefix(authHeader, "Bearer "))
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		claims, err := ParseToken(tokenStr)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "token无效或已过期"})
+			c.Abort()
+			return
+		}
+		// 校验 Redis 中的 Token 是否一致
+		cached, err := database.RDB.Get(context.Background(), redisTokenKey(claims.UserID)).Result()
+		if err != nil || cached != tokenStr {
+			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "token已失效，请重新登录"})
 			c.Abort()
 			return
 		}

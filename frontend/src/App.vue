@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Icons from '@element-plus/icons-vue'
@@ -143,6 +143,7 @@ const resolveIcon = (iconName) => {
 }
 
 const loadMenus = async () => {
+  if (!localStorage.getItem('token')) return
   try {
     const res = await getMenus({ tree: 1 })
     const list = res.data?.data || []
@@ -289,7 +290,11 @@ const handleCommand = async (cmd) => {
 }
 
 onMounted(() => {
-  loadMenus()
+  if (route.path !== '/login') loadMenus()
+})
+
+watch(() => route.path, (newPath, oldPath) => {
+  if (oldPath === '/login' && newPath !== '/login') loadMenus()
 })
 </script>
 
