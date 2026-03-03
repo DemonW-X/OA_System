@@ -173,7 +173,7 @@ func GetOrchidWorkflowHistories(c *gin.Context) {
 
 	// 按实例分组历史，方便前端分轮次展示
 	type instanceWithHistory struct {
-		Instance models.OrchidWorkflowInstance  `json:"instance"`
+		Instance  models.OrchidWorkflowInstance  `json:"instance"`
 		Histories []models.OrchidWorkflowHistory `json:"histories"`
 	}
 	rounds := make([]instanceWithHistory, 0, len(instances))
@@ -197,15 +197,15 @@ func GetOrchidWorkflowHistories(c *gin.Context) {
 }
 
 type PendingApprovalItem struct {
-	TaskID      int    `json:"task_id"`
-	BizType     string `json:"biz_type"`
-	BizID       int    `json:"biz_id"`
-	NodeKey     string `json:"node_key"`
-	Title       string `json:"title"`
-	Status      string `json:"status"`
-	CreatedAt   string `json:"created_at"`
-	DetailPath  string `json:"detail_path"`
-	InstanceID  int    `json:"instance_id"`
+	TaskID     int    `json:"task_id"`
+	BizType    string `json:"biz_type"`
+	BizID      int    `json:"biz_id"`
+	NodeKey    string `json:"node_key"`
+	Title      string `json:"title"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"created_at"`
+	DetailPath string `json:"detail_path"`
+	InstanceID int    `json:"instance_id"`
 }
 
 func buildApprovalTitle(ins models.OrchidWorkflowInstance) string {
@@ -228,6 +228,19 @@ func buildApprovalTitle(ins models.OrchidWorkflowInstance) string {
 		if err := database.DB.First(&booking, ins.BizID).Error; err == nil {
 			return fmt.Sprintf("事件预定：%s", booking.Title)
 		}
+	case "notice":
+		var notice models.Notice
+		if err := database.DB.First(&notice, ins.BizID).Error; err == nil {
+			return fmt.Sprintf("公告审批：%s", notice.Title)
+		}
+	case "resignation":
+		var rz models.Resignation
+		if err := database.DB.Preload("Employee").First(&rz, ins.BizID).Error; err == nil {
+			if rz.Employee != nil {
+				return fmt.Sprintf("离职审批：%s", rz.Employee.Name)
+			}
+			return fmt.Sprintf("离职审批：#%d", rz.ID)
+		}
 	}
 	return fmt.Sprintf("%s #%d", ins.BizType, ins.BizID)
 }
@@ -240,6 +253,10 @@ func buildApprovalDetailPath(bizType string, bizID int) string {
 		return fmt.Sprintf("/leave-request?id=%d", bizID)
 	case "event_booking":
 		return fmt.Sprintf("/event-booking?id=%d", bizID)
+	case "notice":
+		return fmt.Sprintf("/notice?id=%d", bizID)
+	case "resignation":
+		return fmt.Sprintf("/resignation?id=%d", bizID)
 	default:
 		return "/dashboard"
 	}

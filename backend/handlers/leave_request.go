@@ -113,13 +113,13 @@ func CreateLeaveRequest(c *gin.Context) {
 		return
 	}
 	leave := models.LeaveRequest{
-		EmployeeID: req.EmployeeID,
-		Type:       req.Type,
-		StartDate:  startDate,
-		EndDate:    endDate,
-		Days:       req.Days,
-		Reason:     req.Reason,
-		Status:     "draft",
+		EmployeeID:   req.EmployeeID,
+		Type:         req.Type,
+		StartDate:    startDate,
+		EndDate:      endDate,
+		Days:         req.Days,
+		Reason:       req.Reason,
+		Status:       "draft",
 		WorkflowLogs: "[]",
 	}
 	if err := database.DB.Create(&leave).Error; err != nil {
@@ -193,23 +193,18 @@ func SubmitLeaveRequest(c *gin.Context) {
 	}
 	var req LeaveRequestSubmit
 	_ = c.ShouldBindJSON(&req)
-	now := time.Now()
 	op := currentOperator(c)
-	leave.SubmittedBy = op
-	leave.SubmittedAt = &now
-
-	if hasOrchidWorkflowForBiz("leave_request") {
-		if _, err := startOrchidInstance("leave_request", leave.ID, op); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "流程实例启动失败: " + err.Error()})
-			return
-		}
-		leave.Status = "pending"
-	} else {
-		leave.Status = "approved"
-		leave.ApprovedBy = op
-		leave.ApprovedAt = &now
+	ret, err := submitApprovalFlow("leave_request", leave.ID, op)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "流程实例启动失败: " + err.Error()})
+		return
 	}
-	leave.WorkflowLogs = buildBizWorkflowLogs("leave_request", leave.ID)
+	leave.Status = ret.Status
+	leave.SubmittedBy = ret.SubmittedBy
+	leave.SubmittedAt = ret.SubmittedAt
+	leave.ApprovedBy = ret.ApprovedBy
+	leave.ApprovedAt = ret.ApprovedAt
+	leave.WorkflowLogs = ret.WorkflowLogs
 	if err := database.DB.Save(&leave).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交失败"})
 		return
@@ -241,22 +236,21 @@ func ApproveLeaveRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "状态只能为 approved 或 rejected"})
 		return
 	}
-	now := time.Now()
 	op := currentOperator(c)
-	finalStatus, err := approveOrRejectInstance("leave_request", leave.ID, op, req.Status, req.RejectReason)
+	ret, err := approveApprovalFlow("leave_request", leave.ID, op, req.Status, req.RejectReason)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败"})
 		return
 	}
-	leave.Status = finalStatus
-	leave.ApprovedBy = op
-	leave.ApprovedAt = &now
-	leave.RejectReason = req.RejectReason
+	leave.Status = ret.Status
+	leave.ApprovedBy = ret.ApprovedBy
+	leave.ApprovedAt = ret.ApprovedAt
+	leave.RejectReason = ret.ApproveRemark
 	action := "审批通过"
 	if req.Status == "rejected" {
 		action = "审批拒绝"
 	}
-	leave.WorkflowLogs = buildBizWorkflowLogs("leave_request", leave.ID)
+	leave.WorkflowLogs = ret.WorkflowLogs
 	if err := database.DB.Save(&leave).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败"})
 		return

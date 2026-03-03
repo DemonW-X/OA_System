@@ -15,29 +15,7 @@
         active-text-color="#409EFF"
         class="sidebar-menu"
       >
-        <template v-for="m in menus" :key="m.id">
-          <el-sub-menu v-if="(m.children || []).length" :index="m.path || `menu-${m.id}`">
-            <template #title>
-              <el-tooltip :content="m.name" placement="right" :disabled="!isCollapsed">
-                <el-icon><component :is="resolveIcon(m.icon)" /></el-icon>
-              </el-tooltip>
-              <span>{{ m.name }}</span>
-            </template>
-            <el-menu-item v-for="c in m.children" :key="c.id" :index="c.path || `menu-${c.id}`">
-              <el-tooltip :content="c.name" placement="right" :disabled="!isCollapsed">
-                <el-icon><component :is="resolveIcon(c.icon)" /></el-icon>
-              </el-tooltip>
-              <span>{{ c.name }}</span>
-            </el-menu-item>
-          </el-sub-menu>
-
-          <el-menu-item v-else :index="m.path || `menu-${m.id}`">
-            <el-tooltip :content="m.name" placement="right" :disabled="!isCollapsed">
-              <el-icon><component :is="resolveIcon(m.icon)" /></el-icon>
-            </el-tooltip>
-            <span>{{ m.name }}</span>
-          </el-menu-item>
-        </template>
+        <MenuNode v-for="m in menus" :key="m.id" :node="m" :resolve-icon="resolveIcon" :is-collapsed="isCollapsed" />
       </el-menu>
       <div class="sidebar-bottom">
         <el-tooltip :content="isCollapsed ? '展开菜单' : '折叠菜单'" placement="right">
@@ -124,7 +102,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineComponent, h, resolveComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Icons from '@element-plus/icons-vue'
@@ -141,6 +119,53 @@ const resolveIcon = (iconName) => {
   if (iconName && Icons[iconName]) return Icons[iconName]
   return Icons.Menu
 }
+
+const MenuNode = defineComponent({
+  name: 'MenuNode',
+  props: {
+    node: { type: Object, required: true },
+    resolveIcon: { type: Function, required: true },
+    isCollapsed: { type: Boolean, default: false }
+  },
+  setup(props) {
+    return () => {
+      const n = props.node || {}
+      const hasChildren = Array.isArray(n.children) && n.children.length > 0
+      const idx = n.path || `menu-${n.id}`
+
+      const ElSubMenu = resolveComponent('el-sub-menu')
+      const ElMenuItem = resolveComponent('el-menu-item')
+      const ElTooltip = resolveComponent('el-tooltip')
+      const ElIcon = resolveComponent('el-icon')
+
+      if (hasChildren) {
+        return h(ElSubMenu, { index: idx }, {
+          title: () => [
+            h(ElTooltip, { content: n.name, placement: 'right', disabled: !props.isCollapsed }, {
+              default: () => h(ElIcon, null, { default: () => h(props.resolveIcon(n.icon)) })
+            }),
+            h('span', null, n.name)
+          ],
+          default: () => (n.children || []).map((c) => h(MenuNode, {
+            key: c.id,
+            node: c,
+            resolveIcon: props.resolveIcon,
+            isCollapsed: props.isCollapsed
+          }))
+        })
+      }
+
+      return h(ElMenuItem, { index: idx }, {
+        default: () => [
+          h(ElTooltip, { content: n.name, placement: 'right', disabled: !props.isCollapsed }, {
+            default: () => h(ElIcon, null, { default: () => h(props.resolveIcon(n.icon)) })
+          }),
+          h('span', null, n.name)
+        ]
+      })
+    }
+  }
+})
 
 const loadMenus = async () => {
   if (!localStorage.getItem('token')) return

@@ -190,22 +190,18 @@ func SubmitEventBooking(c *gin.Context) {
 	}
 	var req EventBookingSubmit
 	_ = c.ShouldBindJSON(&req)
-	now := time.Now()
 	op := currentOperator(c)
-	booking.SubmittedBy = op
-	booking.SubmittedAt = &now
-	if hasOrchidWorkflowForBiz("event_booking") {
-		if _, err := startOrchidInstance("event_booking", booking.ID, op); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "流程实例启动失败: " + err.Error()})
-			return
-		}
-		booking.Status = "pending"
-	} else {
-		booking.Status = "approved"
-		booking.ApprovedBy = op
-		booking.ApprovedAt = &now
+	ret, err := submitApprovalFlow("event_booking", booking.ID, op)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "流程实例启动失败: " + err.Error()})
+		return
 	}
-	booking.WorkflowLogs = buildBizWorkflowLogs("event_booking", booking.ID)
+	booking.Status = ret.Status
+	booking.SubmittedBy = ret.SubmittedBy
+	booking.SubmittedAt = ret.SubmittedAt
+	booking.ApprovedBy = ret.ApprovedBy
+	booking.ApprovedAt = ret.ApprovedAt
+	booking.WorkflowLogs = ret.WorkflowLogs
 	if err := database.DB.Save(&booking).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交失败"})
 		return
@@ -240,22 +236,21 @@ func ApproveEventBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "状态只能为 approved 或 rejected"})
 		return
 	}
-	now := time.Now()
 	op := currentOperator(c)
-	finalStatus, err := approveOrRejectInstance("event_booking", booking.ID, op, req.Status, req.RejectReason)
+	ret, err := approveApprovalFlow("event_booking", booking.ID, op, req.Status, req.RejectReason)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败"})
 		return
 	}
-	booking.Status = finalStatus
-	booking.ApprovedBy = op
-	booking.ApprovedAt = &now
-	booking.RejectReason = req.RejectReason
+	booking.Status = ret.Status
+	booking.ApprovedBy = ret.ApprovedBy
+	booking.ApprovedAt = ret.ApprovedAt
+	booking.RejectReason = ret.ApproveRemark
 	action := "审批通过"
 	if req.Status == "rejected" {
 		action = "审批拒绝"
 	}
-	booking.WorkflowLogs = buildBizWorkflowLogs("event_booking", booking.ID)
+	booking.WorkflowLogs = ret.WorkflowLogs
 	if err := database.DB.Save(&booking).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败"})
 		return

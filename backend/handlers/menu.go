@@ -5,11 +5,9 @@ import (
 	"oa-system/database"
 	"oa-system/models"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type MenuRequest struct {
@@ -74,50 +72,6 @@ func buildMenuTree(list []models.Menu) []MenuTreeItem {
 	return build(0)
 }
 
-func getEmployeeAssignedMenuIDs(employeeID int) []int {
-	if employeeID <= 0 {
-		return []int{}
-	}
-	var links []models.EmployeeMenuPermission
-	database.DB.Where("employee_id = ?", employeeID).Find(&links)
-	if len(links) == 0 {
-		return []int{}
-	}
-	ids := make([]int, 0, len(links))
-	for _, l := range links {
-		ids = append(ids, l.MenuID)
-	}
-	return ids
-}
-
-func resolveMenuFilterEmployeeID(c *gin.Context) (int, bool) {
-	if employeeIDStr := strings.TrimSpace(c.Query("employee_id")); employeeIDStr != "" {
-		employeeID, err := strconv.Atoi(employeeIDStr)
-		if err != nil || employeeID <= 0 {
-			return 0, false
-		}
-		return employeeID, true
-	}
-
-	role := c.GetString("role")
-	if role == "admin" {
-		return 0, false
-	}
-	userID := c.GetInt("userID")
-	if userID <= 0 {
-		return 0, true
-	}
-	var emp models.Employee
-	err := database.DB.Select("id").Where("user_id = ?", userID).First(&emp).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return 0, true
-		}
-		return 0, false
-	}
-	return emp.ID, true
-}
-
 func GetMenus(c *gin.Context) {
 	var list []models.Menu
 	query := database.DB.Model(&models.Menu{})
@@ -126,17 +80,15 @@ func GetMenus(c *gin.Context) {
 		query = query.Where("name LIKE ? OR path LIKE ?", like, like)
 	}
 
-	if employeeID, needFilter := resolveMenuFilterEmployeeID(c); needFilter {
-		ids := getEmployeeAssignedMenuIDs(employeeID)
-		if len(ids) == 0 {
-			if c.DefaultQuery("tree", "1") == "1" {
-				c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
-			} else {
-				c.JSON(http.StatusOK, gin.H{"code": 0, "data": []models.Menu{}})
-			}
-			return
+	if q, empty := applyMenuPermissionScope(c, query); empty {
+		if c.DefaultQuery("tree", "1") == "1" {
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
+		} else {
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": []models.Menu{}})
 		}
-		query = query.Where("id IN ?", ids)
+		return
+	} else {
+		query = q
 	}
 
 	query.Order("sort_code asc, id asc").Find(&list)

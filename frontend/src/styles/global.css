@@ -1,0 +1,11 @@
+/* 全局样式：统一列表表头与数据内容居中 */
+.el-table .el-table__header-wrapper th.el-table__cell,
+.el-table .el-table__body-wrapper td.el-table__cell {
+  text-align: center;
+}
+
+.el-table .el-table__header-wrapper th.el-table__cell > .cell,
+.el-table .el-table__body-wrapper td.el-table__cell > .cell {
+  justify-content: center;
+  text-align: center;
+}

@@ -2,10 +2,9 @@ package handlers
 
 import (
 	"net/http"
-	"regexp"
-	"time"
 	"oa-system/database"
 	"oa-system/models"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -247,28 +246,15 @@ func SubmitEmployee(c *gin.Context) {
 	}
 
 	op := currentOperator(c)
-	now := time.Now()
-
-	if hasOrchidWorkflowForBiz("employee") {
-		ins, err := startOrchidInstance("employee", emp.ID, op)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "流程实例启动失败: " + err.Error()})
-			return
-		}
-		if ins != nil && ins.Status == "approved" {
-			emp.ApproveStatus = "approved"
-			emp.ApprovedBy = op
-			emp.ApprovedAt = &now
-			emp.ApproveRemark = "流程到达结束节点，自动通过"
-		} else {
-			emp.ApproveStatus = "pending"
-		}
-	} else {
-		emp.ApproveStatus = "approved"
-		emp.ApprovedBy = op
-		emp.ApprovedAt = &now
-		emp.ApproveRemark = "无流程定义，自动通过"
+	ret, err := submitApprovalFlow("employee", emp.ID, op)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "流程实例启动失败: " + err.Error()})
+		return
 	}
+	emp.ApproveStatus = ret.Status
+	emp.ApprovedBy = ret.ApprovedBy
+	emp.ApprovedAt = ret.ApprovedAt
+	emp.ApproveRemark = ret.ApproveRemark
 
 	if err := database.DB.Save(&emp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交审核失败"})
@@ -294,36 +280,10 @@ func WithdrawEmployee(c *gin.Context) {
 		return
 	}
 
-	// 检查流程实例：第一个节点是否还未有人审批通过
-	ins, err := getInstanceByBiz("employee", emp.ID)
-	if err == nil {
-		// 查是否已有 approved/approved_partial/rejected 历史（排除 submit/pending）
-		var doneCount int64
-		database.DB.Model(&models.OrchidWorkflowHistory{}).
-			Where("instance_id = ? AND action IN ?", ins.ID, []string{"approved", "approved_partial", "rejected"}).
-			Count(&doneCount)
-		if doneCount > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "已有节点审批，无法撤回"})
-			return
-		}
-		// 关闭所有待办任务
-		database.DB.Model(&models.OrchidWorkflowTask{}).
-			Where("instance_id = ? AND status = 'open'", ins.ID).
-			Update("status", "withdrawn")
-		// 记录撤回历史
-		op := currentOperator(c)
-		database.DB.Create(&models.OrchidWorkflowHistory{
-			InstanceID: ins.ID,
-			NodeKey:    "withdraw",
-			Action:     "withdraw",
-			Operator:   op,
-			Remark:     "申请人撤回",
-		})
-		// 更新实例状态
-		now := time.Now()
-		ins.Status = "withdrawn"
-		ins.FinishedAt = &now
-		database.DB.Save(ins)
+	op := currentOperator(c)
+	if err := withdrawApprovalFlow("employee", emp.ID, op); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
+		return
 	}
 
 	emp.ApproveStatus = "draft"
@@ -365,16 +325,15 @@ func ApproveEmployee(c *gin.Context) {
 	if approver == "" {
 		approver = c.GetString("username")
 	}
-	now := time.Now()
-	finalStatus, err := approveOrRejectInstance("employee", emp.ID, approver, req.Action, req.Remark)
+	ret, err := approveApprovalFlow("employee", emp.ID, approver, req.Action, req.Remark)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败: " + err.Error()})
 		return
 	}
-	emp.ApproveStatus = finalStatus
-	emp.ApprovedBy = approver
-	emp.ApprovedAt = &now
-	emp.ApproveRemark = req.Remark
+	emp.ApproveStatus = ret.Status
+	emp.ApprovedBy = ret.ApprovedBy
+	emp.ApprovedAt = ret.ApprovedAt
+	emp.ApproveRemark = ret.ApproveRemark
 	if err := database.DB.Save(&emp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败"})
 		return

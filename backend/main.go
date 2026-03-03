@@ -21,7 +21,6 @@ func main() {
 		&models.Employee{},
 		&models.Notice{},
 		&models.OperationLog{},
-		&models.CalendarEvent{},
 		&models.MeetingRoom{},
 		&models.EventBooking{},
 		&models.LeaveRequest{},

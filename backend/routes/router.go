@@ -32,7 +32,6 @@ func SetupRouter() *gin.Engine {
 	employeeRoutes(api)
 	noticeRoutes(api)
 	logRoutes(api)
-	calendarRoutes(api)
 	meetingRoomRoutes(api)
 	eventBookingRoutes(api)
 	leaveRequestRoutes(api)

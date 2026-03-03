@@ -70,6 +70,10 @@
             :closable="false"
             style="margin-bottom:10px"
           />
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px">
+            <el-button size="small" @click="handleCheckAll">全选</el-button>
+            <el-button size="small" @click="handleClearAll">清空</el-button>
+          </div>
           <el-tree
             ref="treeRef"
             :data="menuTree"
@@ -114,6 +118,8 @@ const activeEmployee = ref({ id: null, name: '' })
 const menuTree = ref([])
 const treeRef = ref()
 const parentMap = ref({})
+const allMenuIds = ref([])
+const loadedCheckedKeys = ref([])
 
 const seqNo = (idx) => (query.value.page - 1) * query.value.page_size + idx + 1
 
@@ -140,23 +146,42 @@ const buildParentMap = (nodes = [], parentId = 0) => {
   }
 }
 
+const collectAllMenuIds = (nodes = []) => {
+  const ids = []
+  const walk = (arr = []) => {
+    for (const n of arr) {
+      ids.push(n.id)
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(nodes)
+  return ids
+}
+
 const openPermissionDialog = async (row) => {
   activeEmployee.value = { id: row.id, name: row.name }
   dialogVisible.value = true
   dialogLoading.value = true
   menuTree.value = []
   parentMap.value = {}
+  allMenuIds.value = []
+  loadedCheckedKeys.value = []
+
   try {
     const res = await getEmployeeMenuPermissions(row.id)
     const data = res.data?.data || {}
     menuTree.value = data.menu_tree || []
+    allMenuIds.value = collectAllMenuIds(menuTree.value)
     buildParentMap(menuTree.value)
-
-    await nextTick()
-    treeRef.value?.setCheckedKeys(data.checked_menu_ids || [])
+    loadedCheckedKeys.value = data.checked_menu_ids || []
   } finally {
     dialogLoading.value = false
   }
+
+  // 注意：需要等 skeleton 渲染出 el-tree 后再回显勾选
+  await nextTick()
+  const checked = includeParentKeys(loadedCheckedKeys.value)
+  treeRef.value?.setCheckedKeys(checked)
 }
 
 const includeParentKeys = (keys = []) => {
@@ -175,6 +200,14 @@ const handleTreeCheck = () => {
   const keys = treeRef.value?.getCheckedKeys(false) || []
   const merged = includeParentKeys(keys)
   treeRef.value?.setCheckedKeys(merged)
+}
+
+const handleCheckAll = () => {
+  treeRef.value?.setCheckedKeys(allMenuIds.value)
+}
+
+const handleClearAll = () => {
+  treeRef.value?.setCheckedKeys([])
 }
 
 const handleSave = async () => {
