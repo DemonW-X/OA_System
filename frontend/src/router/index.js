@@ -14,7 +14,8 @@ const routes = [
   { path: '/leave-request', component: () => import('../views/LeaveRequest.vue'), meta: { requiresAuth: true } },
   { path: '/resignation', component: () => import('../views/Resignation.vue'), meta: { requiresAuth: true } },
   { path: '/workflow', component: () => import('../views/Workflow.vue'), meta: { requiresAuth: true } },
-  { path: '/menu', component: () => import('../views/Menu.vue'), meta: { requiresAuth: true } }
+  { path: '/menu', component: () => import('../views/Menu.vue'), meta: { requiresAuth: true } },
+  { path: '/employee-menu-permission', component: () => import('../views/EmployeeMenuPermission.vue'), meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

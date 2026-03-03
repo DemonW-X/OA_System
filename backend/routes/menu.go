@@ -12,4 +12,7 @@ func menuRoutes(rg *gin.RouterGroup) {
 	rg.POST("/menus", handlers.CreateMenu)
 	rg.PUT("/menus/:id", handlers.UpdateMenu)
 	rg.DELETE("/menus/:id", handlers.DeleteMenu)
+
+	rg.GET("/employees/:id/menu-permissions", handlers.GetEmployeeMenuPermissions)
+	rg.PUT("/employees/:id/menu-permissions", handlers.SetEmployeeMenuPermissions)
 }

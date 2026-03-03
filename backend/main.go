@@ -34,6 +34,7 @@ func main() {
 		&models.OrchidWorkflowHistory{},
 		&models.OrchidWorkflowTask{},
 		&models.Menu{},
+		&models.EmployeeMenuPermission{},
 	)
 
 	handlers.InitAdmin()
