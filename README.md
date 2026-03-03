@@ -97,7 +97,7 @@ go mod tidy
 go run main.go
 ```
 
-后端默认监听：`http://localhost:8080`
+后端默认监听：`http://localhost:your_serverport`
 
 > 首次启动会自动迁移数据表，并初始化管理员账号（若库内无用户）：
 > - 用户名：`admin`
@@ -117,9 +117,9 @@ npm run dev
 
 前端默认地址：`http://localhost:5173`
 
-Vite 代理配置：
-- `/api` -> `http://localhost:8080`
-- `/uploads` -> `http://localhost:8080`
+Vite 代理配置修改：
+- `/api` -> `http://localhost:your_serverport`
+- `/uploads` -> `http://localhost:your_serverport`
 
 ---
 
