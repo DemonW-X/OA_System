@@ -233,7 +233,6 @@ import { getEmployees } from '../api/employee'
 import { getOrchidWorkflowHistories, transferOrchidWorkflowTask, skipOrchidWorkflowNode } from '../api/orchid_workflow'
 
 const eventTypes = [
-  { value: 'holiday',  label: '节假日', color: '#F56C6C' },
   { value: 'meeting',  label: '会议',   color: '#409EFF' },
   { value: 'activity', label: '活动',   color: '#67C23A' },
   { value: 'other',    label: '其他',   color: '#909399' },

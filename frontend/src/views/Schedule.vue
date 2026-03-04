@@ -4,6 +4,13 @@
       <el-card shadow="never" class="schedule-card schedule-calendar-card" style="margin-bottom:12px">
         <div class="mini-calendar-wrap">
           <el-calendar v-model="selectedDate">
+            <template #date-cell="{ data }">
+              <div class="calendar-date-cell">
+                <span>{{ Number((data.day || '').split('-')[2]) }}</span>
+                <span v-if="calendarDateFlags[data.day]?.hasLeave" class="calendar-dot leave" title="有请假"></span>
+                <span v-else-if="calendarDateFlags[data.day]?.hasEvent" class="calendar-dot event" title="有事项"></span>
+              </div>
+            </template>
             <template #header>
               <div class="calendar-head-custom">
                 <el-button text class="calendar-nav-btn" @click="changeMonth(-1)"><</el-button>
@@ -99,9 +106,14 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getEventBookings } from '../api/event_booking'
+import { getLeaveRequests } from '../api/leave_request'
+import { getProfile } from '../api/auth'
+import { getEmployees } from '../api/employee'
 
 const selectedDate = ref(new Date())
 const allEvents = ref([])
+const allLeaves = ref([])
+const currentEmployeeID = ref(0)
 const monthPanelVisible = ref(false)
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 let refreshTimer = null
@@ -199,6 +211,28 @@ const mapEvent = (ev) => {
   }
 }
 
+const mapLeave = (lv) => {
+  const start = toDate(lv.start_date)
+  const end = toDate(lv.end_date)
+  return {
+    ...lv,
+    _start: start ? startOfDay(start) : null,
+    _end: end ? endOfDay(end) : null,
+  }
+}
+
+const collectDateSetBetween = (start, end) => {
+  const set = new Set()
+  if (!start || !end) return set
+  let cursor = startOfDay(start)
+  const last = startOfDay(end)
+  while (cursor <= last) {
+    set.add(formatDate(cursor, 'YYYY-MM-DD'))
+    cursor = addDays(cursor, 1)
+  }
+  return set
+}
+
 const todayItems = computed(() => {
   const t = new Date()
   const st = startOfDay(t)
@@ -215,6 +249,28 @@ const rangeItems = computed(() => {
   return allEvents.value
     .filter(ev => ev._start && ev._end && ev._start <= rangeEnd && ev._end >= rangeStart)
     .sort((a, b) => (a._start?.getTime() || 0) - (b._start?.getTime() || 0))
+})
+
+const calendarDateFlags = computed(() => {
+  const map = {}
+
+  for (const ev of allEvents.value) {
+    const dates = collectDateSetBetween(ev._start, ev._end)
+    for (const d of dates) {
+      if (!map[d]) map[d] = { hasEvent: false, hasLeave: false }
+      map[d].hasEvent = true
+    }
+  }
+
+  for (const lv of allLeaves.value) {
+    const dates = collectDateSetBetween(lv._start, lv._end)
+    for (const d of dates) {
+      if (!map[d]) map[d] = { hasEvent: false, hasLeave: false }
+      map[d].hasLeave = true
+    }
+  }
+
+  return map
 })
 
 const hourMarks = [0, 4, 8, 12, 16, 20, 24]
@@ -256,10 +312,34 @@ const ganttColumns = computed(() => {
 const statusText = (s) => ({ upcoming: '未开始', ongoing: '进行中', finished: '已结束' }[s] || '未知')
 const statusTag = (s) => ({ upcoming: 'info', ongoing: 'success', finished: 'warning' }[s] || 'info')
 
+const resolveCurrentEmployeeID = async () => {
+  const profileRes = await getProfile()
+  const userID = Number(profileRes.data?.data?.id || 0)
+  if (!userID) return 0
+
+  const empRes = await getEmployees({ page: 1, page_size: 1000 })
+  const employees = empRes.data?.data?.list || []
+  const hit = employees.find(e => Number(e.user_id) === userID)
+  return Number(hit?.id || 0)
+}
+
 const loadData = async () => {
-  const res = await getEventBookings({ page: 1, page_size: 1000 })
-  const list = res.data?.data?.list || []
-  allEvents.value = list.map(mapEvent)
+  if (!currentEmployeeID.value) {
+    currentEmployeeID.value = await resolveCurrentEmployeeID()
+  }
+
+  const [eventRes, leaveRes] = await Promise.all([
+    getEventBookings({ page: 1, page_size: 1000 }),
+    currentEmployeeID.value
+      ? getLeaveRequests({ page: 1, page_size: 1000, status: 'approved', employee_id: currentEmployeeID.value })
+      : Promise.resolve({ data: { data: { list: [] } } })
+  ])
+
+  const eventList = eventRes.data?.data?.list || []
+  const leaveList = leaveRes.data?.data?.list || []
+
+  allEvents.value = eventList.map(mapEvent)
+  allLeaves.value = leaveList.map(mapLeave)
 }
 
 onMounted(() => {
@@ -536,6 +616,30 @@ onBeforeUnmount(() => {
 .gantt-bar-text {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.calendar-date-cell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.calendar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.calendar-dot.event {
+  background: #409EFF;
+}
+
+.calendar-dot.leave {
+  background: #67C23A;
 }
 
 .today-list { display: flex; flex-direction: column; gap: 6px; }

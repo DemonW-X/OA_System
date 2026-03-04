@@ -8,7 +8,7 @@ type CalendarEvent struct {
 	Description string    `json:"description"`
 	StartTime   time.Time `json:"start_time"`
 	EndTime     time.Time `json:"end_time"`
-	Type        string    `json:"type" gorm:"default:'other'"` // holiday/meeting/activity/other
+	Type        string    `json:"type" gorm:"default:'other'"` // meeting/activity/other
 	CreatedBy   string    `json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`

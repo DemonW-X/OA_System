@@ -26,8 +26,7 @@
       </div>
     </el-aside>
     <el-container>
-      <el-header style="background:#fff;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:16px">OA 办公系统</span>
+      <el-header style="background:#fff;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:flex-end">
         <el-dropdown @command="handleCommand">
           <span style="cursor:pointer;display:flex;align-items:center;gap:6px">
             <el-avatar :size="28" style="background:#409EFF">{{ userInfo.real_name?.[0] || 'U' }}</el-avatar>
