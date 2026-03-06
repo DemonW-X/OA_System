@@ -15,7 +15,8 @@ const routes = [
   { path: '/workflow', component: () => import('../views/Workflow.vue'), meta: { requiresAuth: true } },
   { path: '/menu', component: () => import('../views/Menu.vue'), meta: { requiresAuth: true } },
   { path: '/employee-menu-permission', component: () => import('../views/EmployeeMenuPermission.vue'), meta: { requiresAuth: true } },
-  { path: '/schedule', component: () => import('../views/Schedule.vue'), meta: { requiresAuth: true } }
+  { path: '/schedule', component: () => import('../views/Schedule.vue'), meta: { requiresAuth: true } },
+  { path: '/role', component: () => import('../views/Role.vue'), meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

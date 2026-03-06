@@ -7,7 +7,7 @@
           <template #header>
             <div style="display:flex;align-items:center;gap:8px">
               <el-icon color="#E6A23C"><Bell /></el-icon>
-              <span style="font-weight:bold">待我审核</span>
+              <span style="font-weight:bold">我的审核</span>
               <el-tag size="small" type="warning" style="margin-left:auto">最新 {{ pendingApprovals.length }} 条</el-tag>
               <el-button link type="primary" @click="openAllApprovalsDialog">更多</el-button>
             </div>

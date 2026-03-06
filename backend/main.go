@@ -18,6 +18,7 @@ func main() {
 		&models.User{},
 		&models.Department{},
 		&models.Position{},
+		&models.DepartmentPosition{},
 		&models.Employee{},
 		&models.Notice{},
 		&models.OperationLog{},

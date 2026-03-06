@@ -1,6 +1,6 @@
 <template>
   <el-tabs v-model="activeTab" type="border-card">
-    <!-- 部门管理 Tab -->
+    <!-- 部门管理 -->
     <el-tab-pane label="部门管理" name="department">
       <el-card shadow="never" style="border:none">
         <template #header>
@@ -14,6 +14,12 @@
           <el-form-item label="部门名称">
             <el-input v-model="deptQuery.name" placeholder="请输入部门名称" clearable />
           </el-form-item>
+          <el-form-item label="上级部门">
+            <el-select v-model="deptQuery.parent_id" placeholder="全部" clearable style="width:180px">
+              <el-option label="一级部门" :value="0" />
+              <el-option v-for="d in allDepts" :key="d.id" :label="d.name" :value="d.id" />
+            </el-select>
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleDeptSearch">搜索</el-button>
             <el-button @click="handleDeptReset">重置</el-button>
@@ -23,6 +29,10 @@
         <el-table :data="deptList" stripe>
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="name" label="部门名称" />
+          <el-table-column prop="level" label="层级" width="90" />
+          <el-table-column label="上级部门">
+            <template #default="{ row }">{{ row.parent?.name || '-' }}</template>
+          </el-table-column>
           <el-table-column prop="remark" label="备注" />
           <el-table-column label="操作" width="160">
             <template #default="{ row }">
@@ -44,7 +54,7 @@
       </el-card>
     </el-tab-pane>
 
-    <!-- 职位管理 Tab -->
+    <!-- 职位管理（不绑定部门） -->
     <el-tab-pane label="职位管理" name="position">
       <el-card shadow="never" style="border:none">
         <template #header>
@@ -58,11 +68,6 @@
           <el-form-item label="职位名称">
             <el-input v-model="posQuery.name" placeholder="请输入职位名称" clearable />
           </el-form-item>
-          <el-form-item label="所属部门">
-            <el-select v-model="posQuery.department_id" placeholder="全部" clearable style="width:160px">
-              <el-option v-for="d in allDepts" :key="d.id" :label="d.name" :value="d.id" />
-            </el-select>
-          </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handlePosSearch">搜索</el-button>
             <el-button @click="handlePosReset">重置</el-button>
@@ -72,9 +77,7 @@
         <el-table :data="posList" stripe>
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="name" label="职位名称" />
-          <el-table-column label="所属部门">
-            <template #default="{ row }">{{ row.department?.name }}</template>
-          </el-table-column>
+          <el-table-column prop="sort_order" label="排序" width="90" />
           <el-table-column prop="remark" label="备注" />
           <el-table-column label="操作" width="160">
             <template #default="{ row }">
@@ -97,11 +100,15 @@
     </el-tab-pane>
   </el-tabs>
 
-  <!-- 部门弹窗 -->
-  <el-dialog v-model="deptDialogVisible" :title="deptForm.id ? '编辑部门' : '新增部门'" width="400px">
-    <el-form :model="deptForm" label-width="80px">
+  <el-dialog v-model="deptDialogVisible" :title="deptForm.id ? '编辑部门' : '新增部门'" width="460px">
+    <el-form :model="deptForm" label-width="90px">
       <el-form-item label="部门名称">
         <el-input v-model="deptForm.name" />
+      </el-form-item>
+      <el-form-item label="上级部门">
+        <el-select v-model="deptForm.parent_id" placeholder="不选则为一级部门" clearable style="width:100%">
+          <el-option v-for="d in parentDeptOptions" :key="d.id" :label="`${d.name}（L${d.level || 1}）`" :value="d.id" />
+        </el-select>
       </el-form-item>
       <el-form-item label="备注">
         <el-input v-model="deptForm.remark" type="textarea" />
@@ -113,16 +120,13 @@
     </template>
   </el-dialog>
 
-  <!-- 职位弹窗 -->
   <el-dialog v-model="posDialogVisible" :title="posForm.id ? '编辑职位' : '新增职位'" width="400px">
     <el-form :model="posForm" label-width="80px">
       <el-form-item label="职位名称">
         <el-input v-model="posForm.name" />
       </el-form-item>
-      <el-form-item label="所属部门">
-        <el-select v-model="posForm.department_id" placeholder="请选择部门" style="width:100%">
-          <el-option v-for="d in allDepts" :key="d.id" :label="d.name" :value="d.id" />
-        </el-select>
+      <el-form-item label="排序">
+        <el-input-number v-model="posForm.sort_order" :min="0" style="width:100%" />
       </el-form-item>
       <el-form-item label="备注">
         <el-input v-model="posForm.remark" type="textarea" />
@@ -136,66 +140,63 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../api/department'
 import { getPositions, createPosition, updatePosition, deletePosition } from '../api/position'
 
 const activeTab = ref('department')
 
-// ---- 部门 ----
 const deptList = ref([])
 const deptTotal = ref(0)
 const deptDialogVisible = ref(false)
-const deptForm = ref({ name: '', remark: '' })
-const deptQuery = ref({ name: '', page: 1, page_size: 10 })
+const deptForm = ref({ name: '', parent_id: null, remark: '' })
+const deptQuery = ref({ name: '', parent_id: null, page: 1, page_size: 10 })
 const allDepts = ref([])
 
+const parentDeptOptions = computed(() => allDepts.value.filter(d => (deptForm.value.id ? d.id !== deptForm.value.id : true)))
+
 const loadDepts = async () => {
-  const res = await getDepartments(deptQuery.value)
+  const params = { ...deptQuery.value }
+  if (params.parent_id === null || params.parent_id === undefined || params.parent_id === '') delete params.parent_id
+  const res = await getDepartments(params)
   deptList.value = res.data.data.list || []
   deptTotal.value = res.data.data.total || 0
 }
 
 const loadAllDepts = async () => {
-  const res = await getDepartments({ page: 1, page_size: 100 })
+  const res = await getDepartments({ page: 1, page_size: 1000 })
   allDepts.value = res.data.data.list || []
 }
 
 const handleDeptSearch = () => { deptQuery.value.page = 1; loadDepts() }
-const handleDeptReset = () => { deptQuery.value = { name: '', page: 1, page_size: 10 }; loadDepts() }
+const handleDeptReset = () => { deptQuery.value = { name: '', parent_id: null, page: 1, page_size: 10 }; loadDepts() }
 
 const openDeptDialog = (row = null) => {
-  deptForm.value = row ? { ...row } : { name: '', remark: '' }
+  deptForm.value = row ? { id: row.id, name: row.name, parent_id: row.parent_id ?? null, remark: row.remark } : { name: '', parent_id: null, remark: '' }
   deptDialogVisible.value = true
 }
 
 const handleDeptSubmit = async () => {
-  if (deptForm.value.id) {
-    await updateDepartment(deptForm.value.id, deptForm.value)
-  } else {
-    await createDepartment(deptForm.value)
-  }
+  if (deptForm.value.id) await updateDepartment(deptForm.value.id, deptForm.value)
+  else await createDepartment(deptForm.value)
   ElMessage.success('操作成功')
   deptDialogVisible.value = false
-  loadDepts()
-  loadAllDepts()
+  await Promise.all([loadDepts(), loadAllDepts()])
 }
 
 const handleDeptDelete = async (id) => {
-  await ElMessageBox.confirm('确认删除该部门？删除后该部门下的职位将失去关联。', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确认删除该部门？', '提示', { type: 'warning' })
   await deleteDepartment(id)
   ElMessage.success('删除成功')
-  loadDepts()
-  loadAllDepts()
+  await Promise.all([loadDepts(), loadAllDepts()])
 }
 
-// ---- 职位 ----
 const posList = ref([])
 const posTotal = ref(0)
 const posDialogVisible = ref(false)
-const posForm = ref({ name: '', department_id: null, remark: '' })
-const posQuery = ref({ name: '', department_id: null, page: 1, page_size: 10 })
+const posForm = ref({ name: '', sort_order: 0, remark: '' })
+const posQuery = ref({ name: '', page: 1, page_size: 10 })
 
 const loadPositions = async () => {
   const res = await getPositions(posQuery.value)
@@ -204,19 +205,16 @@ const loadPositions = async () => {
 }
 
 const handlePosSearch = () => { posQuery.value.page = 1; loadPositions() }
-const handlePosReset = () => { posQuery.value = { name: '', department_id: null, page: 1, page_size: 10 }; loadPositions() }
+const handlePosReset = () => { posQuery.value = { name: '', page: 1, page_size: 10 }; loadPositions() }
 
 const openPosDialog = (row = null) => {
-  posForm.value = row ? { ...row } : { name: '', department_id: null, remark: '' }
+  posForm.value = row ? { id: row.id, name: row.name, sort_order: row.sort_order || 0, remark: row.remark } : { name: '', sort_order: 0, remark: '' }
   posDialogVisible.value = true
 }
 
 const handlePosSubmit = async () => {
-  if (posForm.value.id) {
-    await updatePosition(posForm.value.id, posForm.value)
-  } else {
-    await createPosition(posForm.value)
-  }
+  if (posForm.value.id) await updatePosition(posForm.value.id, posForm.value)
+  else await createPosition(posForm.value)
   ElMessage.success('操作成功')
   posDialogVisible.value = false
   loadPositions()
