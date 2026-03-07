@@ -4,7 +4,7 @@ import "time"
 
 type BizType struct {
 	ID        int       `json:"id" gorm:"primaryKey;autoIncrement"`
-	Code      string    `json:"code" gorm:"not null;unique"`  // 业务编码，如 leave
+	Code      string    `json:"code" gorm:"not null"`  // 业务编码，如 leave
 	Name      string    `json:"name" gorm:"not null"`          // 业务名称，如 请假审批
 	Sort      int       `json:"sort" gorm:"default:0"`
 	CreatedAt time.Time `json:"created_at"`
@@ -13,7 +13,7 @@ type BizType struct {
 
 type WorkflowTemplate struct {
 	ID          int             `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name        string          `json:"name" gorm:"not null;unique"`
+	Name        string          `json:"name" gorm:"not null"`
 	Description string          `json:"description"`
 	BizType     string          `json:"biz_type"` // leave/event/other
 	Nodes       []WorkflowNode  `json:"nodes" gorm:"foreignKey:TemplateID;references:ID"`

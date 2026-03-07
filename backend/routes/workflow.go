@@ -17,4 +17,7 @@ func workflowRoutes(rg *gin.RouterGroup) {
 	rg.GET("/biz-types", handlers.GetBizTypes)
 	rg.POST("/biz-types", handlers.CreateBizType)
 	rg.DELETE("/biz-types/:id", handlers.DeleteBizType)
+
+	// 按职位生成审批流程
+	rg.POST("/workflows/generate-by-position", handlers.GeneratePositionWorkflow)
 }

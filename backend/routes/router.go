@@ -23,6 +23,7 @@ func SetupRouter() *gin.Engine {
 
 	// 公开接口
 	r.POST("/api/login", handlers.Login)
+	r.POST("/api/validate/format", handlers.ValidateFormat)
 
 	// 鉴权接口
 	api := r.Group("/api", middleware.JWTAuth())
@@ -40,6 +41,7 @@ func SetupRouter() *gin.Engine {
 	workflowRoutes(api)
 	menuRoutes(api)
 	orchidWorkflowRoutes(api)
+	onboardingRoutes(api)
 
 	// 文件上传接口
 	api.POST("/upload/image", handlers.UploadImage)

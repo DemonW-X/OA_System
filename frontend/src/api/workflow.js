@@ -9,3 +9,5 @@ export const deleteWorkflow = (id) => http.delete(`/workflows/${id}`)
 export const getBizTypes = () => http.get('/biz-types')
 export const createBizType = (data) => http.post('/biz-types', data)
 export const deleteBizType = (id) => http.delete(`/biz-types/${id}`)
+
+export const generatePositionWorkflow = (data) => http.post('/workflows/generate-by-position', data)

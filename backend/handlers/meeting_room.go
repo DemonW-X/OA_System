@@ -42,9 +42,6 @@ func CreateMeetingRoom(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
 	}
-	// 硬删除同名软删除记录，避免唯一索引冲突
-	database.DB.Unscoped().Where("name = ? AND deleted_at IS NOT NULL", req.Name).Delete(&models.MeetingRoom{})
-
 	// 检查未删除的同名记录
 	var count int64
 	database.DB.Model(&models.MeetingRoom{}).Where("name = ?", req.Name).Count(&count)

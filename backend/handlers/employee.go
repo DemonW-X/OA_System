@@ -101,9 +101,6 @@ func CreateEmployee(c *gin.Context) {
 	// 开启事务，保证员工和用户同时创建成功
 	tx := database.DB.Begin()
 
-	// 硬删除同手机号的软删除用户，避免唯一索引冲突
-	tx.Unscoped().Where("username = ? AND deleted_at IS NOT NULL", req.Phone).Delete(&models.User{})
-
 	// 创建登录用户，默认密码 123456
 	hashed, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {

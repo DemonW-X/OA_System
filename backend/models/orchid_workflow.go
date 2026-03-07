@@ -4,7 +4,7 @@ import "time"
 
 type OrchidWorkflowDefinition struct {
 	ID          int       `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name        string    `json:"name" gorm:"not null;unique"`
+	Name        string    `json:"name" gorm:"not null"`
 	BizType     string    `json:"biz_type" gorm:"not null;index"`
 	Description string    `json:"description"`
 	DagJSON     string    `json:"dag_json" gorm:"type:longtext"`

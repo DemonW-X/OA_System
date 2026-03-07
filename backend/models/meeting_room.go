@@ -4,7 +4,7 @@ import "time"
 
 type MeetingRoom struct {
 	ID       int    `json:"id" gorm:"primaryKey;autoIncrement;column:id"`
-	Name     string `json:"name" gorm:"not null;unique"`
+	Name     string `json:"name" gorm:"not null"`
 	Location string `json:"location"`
 	Capacity int    `json:"capacity" gorm:"default:0"`
 	Status   int    `json:"status" gorm:"default:1"` // 1:可用 0:停用

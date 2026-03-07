@@ -8,7 +8,7 @@ import (
 
 type Department struct {
 	ID        int            `json:"id" gorm:"primaryKey;autoIncrement;column:id"`
-	Name      string         `json:"name" gorm:"not null;unique"`
+	Name      string         `json:"name" gorm:"not null"`
 	ParentID  *int           `json:"parent_id" gorm:"index"`
 	Parent    *Department    `json:"parent,omitempty" gorm:"foreignKey:ParentID;references:ID"`
 	Level     int            `json:"level" gorm:"default:1"`

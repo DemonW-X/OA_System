@@ -115,9 +115,6 @@ func CreateDepartment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "上级部门不存在"})
 		return
 	}
-	// 硬删除同名软删除记录，避免唯一索引冲突
-	database.DB.Unscoped().Where("name = ? AND deleted_at IS NOT NULL", req.Name).Delete(&models.Department{})
-
 	dept := models.Department{Name: req.Name, ParentID: req.ParentID, Level: level, Remark: req.Remark}
 	if err := database.DB.Create(&dept).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建失败: " + err.Error()})
