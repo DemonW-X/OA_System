@@ -62,6 +62,9 @@ func GetLeaveRequests(c *gin.Context) {
 	if empID := c.Query("employee_id"); empID != "" {
 		query = query.Where("employee_id = ?", empID)
 	}
+	if empName := c.Query("employee_name"); empName != "" {
+		query = query.Joins("JOIN employees ON employees.id = leave_requests.employee_id").Where("employees.name LIKE ?", "%"+empName+"%")
+	}
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}

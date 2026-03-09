@@ -9,9 +9,7 @@
 
     <el-form :inline="true" style="margin-bottom:16px">
       <el-form-item label="员工">
-        <el-select v-model="query.employee_id" placeholder="全部员工" clearable filterable style="width:180px">
-          <el-option v-for="e in employeeList" :key="e.id" :label="e.name" :value="e.id" />
-        </el-select>
+        <el-input v-model="query.employee_name" placeholder="输入姓名搜索" clearable style="width:180px" />
       </el-form-item>
       <el-form-item label="审批状态">
         <el-select v-model="query.approve_status" placeholder="全部" clearable style="width:130px">
@@ -236,7 +234,7 @@ const total = ref(0)
 const employeeList = ref([])
 const dialogVisible = ref(false)
 const formRef = ref()
-const query = ref({ employee_id: null, approve_status: null, page: 1, page_size: 10 })
+const query = ref({ employee_name: null, approve_status: null, page: 1, page_size: 10 })
 
 const flowVisible = ref(false)
 const flowLoading = ref(false)
@@ -272,7 +270,7 @@ const loadEmployees = async () => {
 
 const loadData = async () => {
   const params = { ...query.value }
-  if (!params.employee_id) delete params.employee_id
+  if (!params.employee_name) delete params.employee_name
   if (!params.approve_status) delete params.approve_status
   const res = await getResignations(params)
   list.value = res.data?.data?.list || []
@@ -285,7 +283,7 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  query.value = { employee_id: null, approve_status: null, page: 1, page_size: 10 }
+  query.value = { employee_name: null, approve_status: null, page: 1, page_size: 10 }
   loadData()
 }
 

@@ -28,6 +28,9 @@ func GetResignations(c *gin.Context) {
 	if empID := c.Query("employee_id"); empID != "" {
 		query = query.Where("employee_id = ?", empID)
 	}
+	if empName := c.Query("employee_name"); empName != "" {
+		query = query.Joins("JOIN employees ON employees.id = resignations.employee_id").Where("employees.name LIKE ?", "%"+empName+"%")
+	}
 	if approveStatus := c.Query("approve_status"); approveStatus != "" {
 		query = query.Where("approve_status = ?", approveStatus)
 	}

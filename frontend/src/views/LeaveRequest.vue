@@ -9,9 +9,7 @@
 
     <el-form :inline="true" style="margin-bottom:16px">
       <el-form-item label="员工">
-        <el-select v-model="query.employee_id" placeholder="全部员工" clearable style="width:140px" filterable>
-          <el-option v-for="e in employeeList" :key="e.id" :label="e.name" :value="e.id" />
-        </el-select>
+        <el-input v-model="query.employee_name" placeholder="输入姓名搜索" clearable style="width:140px" />
       </el-form-item>
       <el-form-item label="类型">
         <el-select v-model="query.type" placeholder="全部" clearable style="width:110px">
@@ -218,7 +216,7 @@ const approveTarget = ref(null)
 const approveForm = ref({ reject_reason: '' })
 const transferForm = ref({ from_user_id: 0, to_user_id: 0, remark: '' })
 const formRef = ref()
-const query = ref({ employee_id: null, type: null, status: null, page: 1, page_size: 10 })
+const query = ref({ employee_name: null, type: null, status: null, page: 1, page_size: 10 })
 
 const defaultForm = () => ({ employee_id: null, type: 'annual', start_date: '', end_date: '', days: 0, reason: '' })
 const form = ref(defaultForm())
@@ -300,7 +298,7 @@ const rules = {
 
 const loadData = async () => {
   const params = { ...query.value }
-  if (!params.employee_id) delete params.employee_id
+  if (!params.employee_name) delete params.employee_name
   if (!params.type)        delete params.type
   if (!params.status)      delete params.status
   const res = await getLeaveRequests(params)
@@ -338,7 +336,7 @@ const loadWorkflowDetail = async (row) => {
 
 const handleSearch = () => { query.value.page = 1; loadData() }
 const handleReset  = () => {
-  query.value = { employee_id: null, type: null, status: null, page: 1, page_size: 10 }
+  query.value = { employee_name: null, type: null, status: null, page: 1, page_size: 10 }
   loadData()
 }
 

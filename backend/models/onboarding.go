@@ -26,6 +26,8 @@ type Onboarding struct {
 	School        string         `json:"school"`         // 毕业院校
 	Major         string         `json:"major"`          // 专业
 	WorkYears     int            `json:"work_years"`     // 工作年限
+	DepartmentID  int            `json:"department_id" gorm:"default:0"`  // 入职部门
+	PositionID    int            `json:"position_id" gorm:"default:0"`     // 入职职位
 	Remark        string         `json:"remark"`
 	ApproveStatus string         `json:"approve_status" gorm:"default:'draft'"` // draft/pending/approved/rejected
 	ApprovedBy    string         `json:"approved_by"`

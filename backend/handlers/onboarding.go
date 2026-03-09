@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type OnboardingRequest struct {
@@ -25,6 +26,8 @@ type OnboardingRequest struct {
 	School         string `json:"school"`
 	Major          string `json:"major"`
 	WorkYears      int    `json:"work_years"`
+	DepartmentID   int    `json:"department_id"`
+	PositionID     int    `json:"position_id"`
 	Remark         string `json:"remark"`
 }
 
@@ -107,6 +110,8 @@ func CreateOnboarding(c *gin.Context) {
 		School:         req.School,
 		Major:          req.Major,
 		WorkYears:      req.WorkYears,
+		DepartmentID:   req.DepartmentID,
+		PositionID:     req.PositionID,
 		Remark:         req.Remark,
 		ApproveStatus:  "draft",
 	}
@@ -170,9 +175,16 @@ func UpdateOnboarding(c *gin.Context) {
 	item.School = req.School
 	item.Major = req.Major
 	item.WorkYears = req.WorkYears
+	item.DepartmentID = req.DepartmentID
+	item.PositionID = req.PositionID
 	item.Remark = req.Remark
 
-	if err := database.DB.Save(&item).Error; err != nil {
+	if err := database.DB.Select(
+		"employee_name", "onboard_date", "onboard_type", "probation_days", "probation_end",
+		"id_card", "phone", "email", "native_place", "address",
+		"emergency_name", "emergency_phone", "education", "school", "major",
+		"work_years", "department_id", "position_id", "remark",
+	).Save(&item).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败"})
 		return
 	}
@@ -228,10 +240,23 @@ func SubmitOnboarding(c *gin.Context) {
 	item.ApprovedAt = ret.ApprovedAt
 	item.ApproveRemark = ret.ApproveRemark
 
-	if err := database.DB.Save(&item).Error; err != nil {
+	tx := database.DB.Begin()
+	if err := tx.Save(&item).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交失败"})
 		return
 	}
+
+	// 无流程定义自动通过时，复用员工创建逻辑
+	if ret.Status == "approved" {
+		if err := syncEmployeeFromOnboarding(tx, &item); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": err.Error()})
+			return
+		}
+	}
+
+	tx.Commit()
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
 	writeLog(c, "入职管理", "提交", "提交入职审核")
 }
@@ -319,44 +344,10 @@ func ApproveOnboarding(c *gin.Context) {
 
 	// 审批通过时联动员工数据
 	if ret.Status == "approved" {
-		if item.OnboardType == "rehire" {
-			// 返聘：只查未软删除、状态为离职(status=0)的员工
-			var emp models.Employee
-			err := tx.Where("name = ? AND phone = ? AND status = 0", item.EmployeeName, item.Phone).First(&emp).Error
-			if err == nil {
-				// 找到离职员工：直接恢复为在职
-				if err := tx.Model(&emp).Update("status", 1).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "恢复员工状态失败"})
-					return
-				}
-			} else {
-				// 未找到离职员工：新建在职员工
-				newEmp := models.Employee{
-					Name:   item.EmployeeName,
-					Phone:  item.Phone,
-					Email:  item.Email,
-					Status: 1,
-				}
-				if err := tx.Create(&newEmp).Error; err != nil {
-					tx.Rollback()
-					c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建员工失败"})
-					return
-				}
-			}
-		} else {
-			// 新员工或调入：直接新建在职员工
-			newEmp := models.Employee{
-				Name:   item.EmployeeName,
-				Phone:  item.Phone,
-				Email:  item.Email,
-				Status: 1,
-			}
-			if err := tx.Create(&newEmp).Error; err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建员工失败"})
-				return
-			}
+		if err := syncEmployeeFromOnboarding(tx, &item); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": err.Error()})
+			return
 		}
 	}
 
@@ -367,6 +358,27 @@ func ApproveOnboarding(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
 	writeLog(c, "入职管理", "审批", action+"入职申请")
+}
+
+// syncEmployeeFromOnboarding 审批通过后联动创建/恢复员工，供 SubmitOnboarding 和 ApproveOnboarding 共用
+func syncEmployeeFromOnboarding(tx *gorm.DB, item *models.Onboarding) error {
+	if item.OnboardType == "rehire" {
+		var emp models.Employee
+		err := tx.Where("name = ? AND phone = ? AND status = 0", item.EmployeeName, item.Phone).First(&emp).Error
+		if err == nil {
+			return tx.Model(&emp).Update("status", 1).Error
+		}
+	}
+	newEmp := models.Employee{
+		Name:         item.EmployeeName,
+		Phone:        item.Phone,
+		Email:        item.Email,
+		DepartmentID: item.DepartmentID,
+		PositionID:   item.PositionID,
+		Status:       1,
+	}
+	// 只插入业务需要的字段，避免触发 employees 表中不存在的审批相关列
+	return tx.Select("name", "phone", "email", "department_id", "position_id", "status").Create(&newEmp).Error
 }
 
 func CancelApproveOnboarding(c *gin.Context) {

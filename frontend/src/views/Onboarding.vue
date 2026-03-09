@@ -9,9 +9,7 @@
 
     <el-form :inline="true" style="margin-bottom:16px">
       <el-form-item label="员工">
-        <el-select v-model="query.employee_id" placeholder="全部员工" clearable filterable style="width:180px">
-          <el-option v-for="e in employeeList" :key="e.id" :label="e.name" :value="e.id" />
-        </el-select>
+        <el-input v-model="query.employee_name" placeholder="输入姓名搜索" clearable style="width:180px" />
       </el-form-item>
       <el-form-item label="入职类型">
         <el-select v-model="query.onboard_type" placeholder="全部" clearable style="width:130px">
@@ -45,19 +43,27 @@
           <el-tag :type="onboardTypeTag(row.onboard_type)" size="small">{{ onboardTypeLabel(row.onboard_type) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="phone" label="联系电话" width="130" />
+      <el-table-column label="联系电话" width="130">
+        <template #default="{ row }">{{ maskPhone(row.phone) }}</template>
+      </el-table-column>
       <el-table-column prop="id_card" label="身份证号" width="180" show-overflow-tooltip />
       <el-table-column prop="native_place" label="籍贯" width="100" show-overflow-tooltip />
       <el-table-column label="试用天数" width="85" prop="probation_days" />
       <el-table-column label="试用截止" width="110">
         <template #default="{ row }">{{ formatDate(row.probation_end) }}</template>
       </el-table-column>
+      <el-table-column label="部门" width="110">
+        <template #default="{ row }">{{ departmentName(row.department_id) }}</template>
+      </el-table-column>
+      <el-table-column label="职位" width="110">
+        <template #default="{ row }">{{ positionName(row.position_id) }}</template>
+      </el-table-column>
       <el-table-column label="审批状态" width="95">
         <template #default="{ row }">
           <el-tag :type="approveTagType(row.approve_status)">{{ approveStatusLabel(row.approve_status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button size="small" type="primary" link @click="openDetail(row)">详情</el-button>
           <el-button size="small" :disabled="!isEditable(row)" @click="openDialog(row)">编辑</el-button>
@@ -118,7 +124,14 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="联系电话" prop="phone">
-              <el-input v-model="form.phone" placeholder="请输入手机号" />
+              <el-input
+                :model-value="maskedPhone"
+                placeholder="请输入手机号"
+                maxlength="11"
+                @input="onPhoneInput"
+                @focus="phoneFocused = true"
+                @blur="phoneFocused = false"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -189,6 +202,20 @@
               <el-input v-model="form.major" placeholder="请输入专业" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="入职部门">
+              <el-select v-model="form.department_id" placeholder="请选择部门" clearable filterable style="width:100%" @change="onDepartmentChange">
+                <el-option v-for="d in departmentList" :key="d.id" :label="d.name" :value="d.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="入职职位">
+              <el-select v-model="form.position_id" placeholder="请先选择部门" clearable filterable style="width:100%" :disabled="!form.department_id">
+                <el-option v-for="p in filteredPositionList" :key="p.id" :label="p.name" :value="p.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="备注">
               <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注（选填）" />
@@ -215,9 +242,11 @@
         <el-descriptions-item label="审批状态">
           <el-tag :type="approveTagType(detailData.approve_status)">{{ approveStatusLabel(detailData.approve_status) }}</el-tag>
         </el-descriptions-item>
+        <el-descriptions-item label="入职部门">{{ departmentName(detailData.department_id) }}</el-descriptions-item>
+        <el-descriptions-item label="入职职位">{{ positionName(detailData.position_id) }}</el-descriptions-item>
         <el-descriptions-item label="审批人">{{ detailData.approved_by || '-' }}</el-descriptions-item>
         <el-descriptions-item label="审批意见">{{ detailData.approve_remark || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="联系电话">{{ detailData.phone || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="联系电话">{{ maskPhone(detailData.phone) }}</el-descriptions-item>
         <el-descriptions-item label="电子邮箱">{{ detailData.email || '-' }}</el-descriptions-item>
         <el-descriptions-item label="身份证号" :span="2">{{ maskIdCard(detailData.id_card) }}</el-descriptions-item>
         <el-descriptions-item label="籍贯">{{ detailData.native_place || '-' }}</el-descriptions-item>
@@ -245,6 +274,9 @@ import {
   getOnboardings, getOnboarding, createOnboarding, updateOnboarding, deleteOnboarding,
   submitOnboarding, withdrawOnboarding, cancelApproveOnboarding
 } from '../api/onboarding'
+import { getDepartments } from '../api/department'
+import { getPositions } from '../api/position'
+import { getDepartmentPositions } from '../api/department_position'
 
 const list = ref([])
 const total = ref(0)
@@ -252,13 +284,30 @@ const dialogVisible = ref(false)
 const detailVisible = ref(false)
 const detailData = ref(null)
 const formRef = ref()
-const query = ref({ employee_id: null, onboard_type: null, approve_status: null, page: 1, page_size: 10 })
+const query = ref({ employee_name: null, onboard_type: null, approve_status: null, page: 1, page_size: 10 })
+const departmentList = ref([])
+const positionList = ref([])
+const filteredPositionList = ref([])
+
+const departmentName = (id) => departmentList.value.find(d => d.id === id)?.name || '-'
+const positionName = (id) => positionList.value.find(p => p.id === id)?.name || '-'
+
+const onDepartmentChange = async (deptId) => {
+  form.value.position_id = null
+  if (!deptId) {
+    filteredPositionList.value = []
+    return
+  }
+  const res = await getDepartmentPositions({ department_id: deptId, page: 1, page_size: 999 })
+  const relations = res.data?.data?.list || []
+  filteredPositionList.value = relations.map(r => ({ id: r.position_id, name: r.position?.name || '' }))
+}
 
 const defaultForm = () => ({
   employee_name: '', onboard_date: '', onboard_type: 'new', probation_days: 90,
   phone: '', email: '', id_card: '', native_place: '', address: '',
   emergency_name: '', emergency_phone: '', education: '', school: '', major: '',
-  work_years: 0, remark: ''
+  work_years: 0, department_id: null, position_id: null, remark: ''
 })
 const form = ref(defaultForm())
 
@@ -279,6 +328,27 @@ const approveTagType = (s) => ({ draft: 'info', pending: 'warning', approved: 's
 const educationLabel = (e) => ({ junior: '初中及以下', high: '高中/中专', college: '大专', bachelor: '本科', master: '硕士', doctor: '博士' }[e] || (e || '-'))
 const isEditable = (row) => ['draft', 'rejected'].includes(row?.approve_status)
 const isDeletable = (row) => ['draft', 'rejected'].includes(row?.approve_status)
+
+// 电话号码脱敏工具函数（第4-7位显示为*）
+const maskPhone = (val) => {
+  if (!val) return '-'
+  if (val.length <= 3) return val
+  const end = Math.min(7, val.length)
+  return val.slice(0, 3) + '*'.repeat(end - 3) + val.slice(end)
+}
+
+// 电话号码脱敏显示（表单输入框）
+const phoneFocused = ref(false)
+const maskedPhone = computed(() => {
+  const val = form.value.phone || ''
+  if (!val || phoneFocused.value) return val
+  if (val.length <= 3) return val
+  const end = Math.min(7, val.length)
+  return val.slice(0, 3) + '*'.repeat(end - 3) + val.slice(end)
+})
+const onPhoneInput = (val) => {
+  form.value.phone = val
+}
 
 // 身份证号脱敏显示（第7-14位显示为*）
 const idCardFocused = ref(false)
@@ -303,7 +373,7 @@ const maskIdCard = (val) => {
 
 const loadData = async () => {
   const params = { ...query.value }
-  if (!params.employee_id) delete params.employee_id
+  if (!params.employee_name) delete params.employee_name
   if (!params.onboard_type) delete params.onboard_type
   if (!params.approve_status) delete params.approve_status
   const res = await getOnboardings(params)
@@ -313,11 +383,11 @@ const loadData = async () => {
 
 const handleSearch = () => { query.value.page = 1; loadData() }
 const handleReset = () => {
-  query.value = { employee_id: null, onboard_type: null, approve_status: null, page: 1, page_size: 10 }
+  query.value = { employee_name: null, onboard_type: null, approve_status: null, page: 1, page_size: 10 }
   loadData()
 }
 
-const openDialog = (row = null) => {
+const openDialog = async (row = null) => {
   if (row) {
     form.value = {
       id: row.id,
@@ -336,10 +406,19 @@ const openDialog = (row = null) => {
       school: row.school || '',
       major: row.major || '',
       work_years: row.work_years || 0,
+      department_id: row.department_id || null,
+      position_id: row.position_id || null,
       remark: row.remark || '',
     }
   } else {
     form.value = defaultForm()
+    filteredPositionList.value = []
+  }
+  // 编辑时预加载部门对应职位
+  if (form.value.department_id) {
+    const res = await getDepartmentPositions({ department_id: form.value.department_id, page: 1, page_size: 999 })
+    const relations = res.data?.data?.list || []
+    filteredPositionList.value = relations.map(r => ({ id: r.position_id, name: r.position?.name || '' }))
   }
   dialogVisible.value = true
 }
@@ -355,6 +434,9 @@ const handleSubmit = async () => {
   const payload = { ...form.value }
   const id = payload.id
   delete payload.id
+  // null 转 0，避免 Go int 类型解析失败
+  if (!payload.department_id) payload.department_id = 0
+  if (!payload.position_id) payload.position_id = 0
   if (id) {
     await updateOnboarding(id, payload)
   } else {
@@ -394,6 +476,12 @@ const handleDelete = async (id) => {
 }
 
 onMounted(async () => {
+  const [deptRes, posRes] = await Promise.all([
+    getDepartments({ page: 1, page_size: 999 }),
+    getPositions({ page: 1, page_size: 999 })
+  ])
+  departmentList.value = deptRes.data?.data?.list || []
+  positionList.value = posRes.data?.data?.list || []
   await loadData()
 })
 </script>

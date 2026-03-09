@@ -35,6 +35,7 @@ func main() {
 		&models.OrchidWorkflowTask{},
 		&models.Menu{},
 		&models.EmployeeMenuPermission{},
+		&models.Onboarding{},
 	)
 
 	handlers.InitAdmin()
