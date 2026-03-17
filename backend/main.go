@@ -5,7 +5,6 @@ import (
 	"oa-system/config"
 	"oa-system/database"
 	"oa-system/handlers"
-	"oa-system/models"
 	"oa-system/routes"
 )
 
@@ -13,30 +12,6 @@ func main() {
 	config.Init()
 	database.InitDB()
 	database.InitRedis()
-
-	database.DB.AutoMigrate(
-		&models.User{},
-		&models.Department{},
-		&models.Position{},
-		&models.DepartmentPosition{},
-		&models.Employee{},
-		&models.Notice{},
-		&models.OperationLog{},
-		&models.MeetingRoom{},
-		&models.EventBooking{},
-		&models.LeaveRequest{},
-		&models.Resignation{},
-		&models.WorkflowTemplate{},
-		&models.WorkflowNode{},
-		&models.BizType{},
-		&models.OrchidWorkflowDefinition{},
-		&models.OrchidWorkflowInstance{},
-		&models.OrchidWorkflowHistory{},
-		&models.OrchidWorkflowTask{},
-		&models.Menu{},
-		&models.EmployeeMenuPermission{},
-		&models.Onboarding{},
-	)
 
 	handlers.InitAdmin()
 	handlers.InitBizTypes()

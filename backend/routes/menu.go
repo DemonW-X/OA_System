@@ -15,4 +15,6 @@ func menuRoutes(rg *gin.RouterGroup) {
 
 	rg.GET("/employees/:id/menu-permissions", handlers.GetEmployeeMenuPermissions)
 	rg.PUT("/employees/:id/menu-permissions", handlers.SetEmployeeMenuPermissions)
+
+
 }

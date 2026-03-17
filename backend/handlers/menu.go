@@ -11,25 +11,33 @@ import (
 )
 
 type MenuRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Icon     string `json:"icon"`
-	Path     string `json:"path"`
-	SortCode int    `json:"sort_code"`
-	ParentID int    `json:"parent_id"`
-	Visible  *bool  `json:"visible"`
-	Remark   string `json:"remark"`
+	Name           string `json:"name" binding:"required"`
+	Icon           string `json:"icon"`
+	Path           string `json:"path"`
+	SortCode       int    `json:"sort_code"`
+	ParentID       int    `json:"parent_id"`
+	Visible        *bool  `json:"visible"`
+	Remark         string `json:"remark"`
+	EnableWorkflow bool   `json:"enable_workflow"` // 是否启用审批流
+	BizCode        string `json:"biz_code"`        // 业务编码，如 leave_request
+	BizName        string `json:"biz_name"`        // 业务名称，如 请假审批
+	BizSort        int    `json:"biz_sort"`        // 排序
 }
 
 type MenuTreeItem struct {
-	ID       int            `json:"id"`
-	Name     string         `json:"name"`
-	Icon     string         `json:"icon"`
-	Path     string         `json:"path"`
-	SortCode int            `json:"sort_code"`
-	ParentID int            `json:"parent_id"`
-	Visible  bool           `json:"visible"`
-	Remark   string         `json:"remark"`
-	Children []MenuTreeItem `json:"children"`
+	ID             int            `json:"id"`
+	Name           string         `json:"name"`
+	Icon           string         `json:"icon"`
+	Path           string         `json:"path"`
+	SortCode       int            `json:"sort_code"`
+	ParentID       int            `json:"parent_id"`
+	Visible        bool           `json:"visible"`
+	Remark         string         `json:"remark"`
+	EnableWorkflow bool           `json:"enable_workflow"`
+	BizCode        string         `json:"biz_code"`
+	BizName        string         `json:"biz_name"`
+	BizSort        int            `json:"biz_sort"`
+	Children       []MenuTreeItem `json:"children"`
 }
 
 type EmployeeMenuPermissionRequest struct {
@@ -37,6 +45,20 @@ type EmployeeMenuPermissionRequest struct {
 }
 
 func buildMenuTree(list []models.Menu) []MenuTreeItem {
+	// 预加载所有审批流配置，避免 N+1
+	var configs []models.MenuWorkflowConfig
+	database.DB.Find(&configs)
+	cfgByMenu := map[int]models.MenuWorkflowConfig{}
+	for _, cfg := range configs {
+		cfgByMenu[cfg.MenuID] = cfg
+	}
+	var bizTypes []models.BizType
+	database.DB.Find(&bizTypes)
+	bizByID := map[int]models.BizType{}
+	for _, b := range bizTypes {
+		bizByID[b.ID] = b
+	}
+
 	byParent := map[int][]models.Menu{}
 	for _, m := range list {
 		byParent[m.ParentID] = append(byParent[m.ParentID], m)
@@ -54,7 +76,7 @@ func buildMenuTree(list []models.Menu) []MenuTreeItem {
 
 		res := make([]MenuTreeItem, 0, len(src))
 		for _, m := range src {
-			res = append(res, MenuTreeItem{
+			item := MenuTreeItem{
 				ID:       m.ID,
 				Name:     m.Name,
 				Icon:     m.Icon,
@@ -64,7 +86,16 @@ func buildMenuTree(list []models.Menu) []MenuTreeItem {
 				Visible:  m.Visible,
 				Remark:   m.Remark,
 				Children: build(m.ID),
-			})
+			}
+			if cfg, ok := cfgByMenu[m.ID]; ok {
+				item.EnableWorkflow = true
+				if biz, ok2 := bizByID[cfg.BizTypeID]; ok2 {
+					item.BizCode = biz.Code
+					item.BizName = biz.Name
+					item.BizSort = biz.Sort
+				}
+			}
+			res = append(res, item)
 		}
 		return res
 	}
@@ -143,6 +174,8 @@ func CreateMenu(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建失败: " + err.Error()})
 		return
 	}
+	// 同步审批流配置
+	syncMenuWorkflowConfig(m.ID, req.EnableWorkflow, req.BizCode, req.BizName, req.BizSort)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 	writeLog(c, "菜单管理", "新增", "新增菜单："+req.Name)
 }
@@ -187,6 +220,8 @@ func UpdateMenu(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败: " + err.Error()})
 		return
 	}
+	// 同步审批流配置
+	syncMenuWorkflowConfig(m.ID, req.EnableWorkflow, req.BizCode, req.BizName, req.BizSort)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 	writeLog(c, "菜单管理", "修改", "修改菜单："+req.Name)
 }
@@ -207,6 +242,7 @@ func DeleteMenu(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "请先删除子菜单"})
 		return
 	}
+	DeleteMenuWorkflowConfigByMenuID(id)
 	if err := database.DB.Delete(&m).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "删除失败"})
 		return

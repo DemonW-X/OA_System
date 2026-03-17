@@ -1,201 +1,32 @@
 package handlers
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"net/http"
 	"oa-system/database"
 	"oa-system/models"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-var routeRegisterRegex = regexp.MustCompile(`rg\.(GET|POST|PUT|DELETE)\("([^"]+)",\s*handlers\.([A-Za-z0-9_]+)\)`)
-
-// InitBizTypes 根据现有 routes + handlers 动态初始化业务类型（已存在则更新）
+// InitBizTypes 启动时校验 menu_workflow_configs 关联的 biz_types 记录是否完整
+// 关联表是主数据源，biz_types 由关联表的增删来维护，这里只做孤立记录清理
 func InitBizTypes() {
-	list := discoverBizTypesFromRoutes()
-	for _, b := range list {
-		var existed models.BizType
-		err := database.DB.Where("code = ?", b.Code).First(&existed).Error
-		if err != nil {
-			database.DB.Create(&b)
-			continue
-		}
-		existed.Name = b.Name
-		existed.Sort = b.Sort
-		database.DB.Save(&existed)
-	}
-}
-
-func discoverBizTypesFromRoutes() []models.BizType {
-	handlerModuleMap := buildHandlerModuleMap()
-
-	type routeBiz struct {
-		pathBase string
-		hasPost  bool
-		handlers []string
-	}
-	bizMap := map[string]*routeBiz{}
-
-	routeFiles, err := os.ReadDir("./routes")
-	if err != nil {
-		return []models.BizType{}
-	}
-	for _, f := range routeFiles {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".go") {
-			continue
-		}
-		content, err := os.ReadFile(filepath.Join("./routes", f.Name()))
-		if err != nil {
-			continue
-		}
-		matches := routeRegisterRegex.FindAllStringSubmatch(string(content), -1)
-		for _, m := range matches {
-			method, path, handlerFn := m[1], m[2], m[3]
-			base := routeBase(path)
-			if base == "" || shouldIgnoreBizBase(base) {
-				continue
-			}
-			item, ok := bizMap[base]
-			if !ok {
-				item = &routeBiz{pathBase: base}
-				bizMap[base] = item
-			}
-			if method == "POST" {
-				item.hasPost = true
-			}
-			if !contains(item.handlers, handlerFn) {
-				item.handlers = append(item.handlers, handlerFn)
-			}
-		}
+	// 查询所有关联的 biz_type_id
+	var configs []models.MenuWorkflowConfig
+	database.DB.Find(&configs)
+	linkedIDs := map[int]bool{}
+	for _, cfg := range configs {
+		linkedIDs[cfg.BizTypeID] = true
 	}
 
-	bases := make([]string, 0, len(bizMap))
-	for base, item := range bizMap {
-		if item.hasPost {
-			bases = append(bases, base)
+	// 删除 biz_types 中没有被任何菜单关联的孤立记录
+	var allBiz []models.BizType
+	database.DB.Find(&allBiz)
+	for _, b := range allBiz {
+		if !linkedIDs[b.ID] {
+			database.DB.Delete(&models.BizType{}, b.ID)
 		}
 	}
-	sort.Strings(bases)
-
-	result := make([]models.BizType, 0, len(bases))
-	for i, base := range bases {
-		item := bizMap[base]
-		name := displayNameFromHandlers(item.handlers, handlerModuleMap)
-		if name == "" {
-			name = strings.ReplaceAll(base, "-", " ")
-		}
-		result = append(result, models.BizType{
-			Code: normalizeBizCode(base),
-			Name: name,
-			Sort: i + 1,
-		})
-	}
-	return result
-}
-
-func buildHandlerModuleMap() map[string]string {
-	result := map[string]string{}
-	files, err := os.ReadDir("./handlers")
-	if err != nil {
-		return result
-	}
-
-	for _, f := range files {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".go") {
-			continue
-		}
-		path := filepath.Join("./handlers", f.Name())
-		fset := token.NewFileSet()
-		node, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
-		if err != nil {
-			continue
-		}
-		for _, decl := range node.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Body == nil {
-				continue
-			}
-			module := findWriteLogModule(fn)
-			if module != "" {
-				result[fn.Name.Name] = module
-			}
-		}
-	}
-	return result
-}
-
-func findWriteLogModule(fn *ast.FuncDecl) string {
-	var module string
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) < 2 {
-			return true
-		}
-		ident, ok := call.Fun.(*ast.Ident)
-		if !ok || ident.Name != "writeLog" {
-			return true
-		}
-		lit, ok := call.Args[1].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		module = strings.Trim(lit.Value, "\"")
-		return false
-	})
-	return module
-}
-
-func routeBase(path string) string {
-	path = strings.TrimSpace(path)
-	path = strings.TrimPrefix(path, "/")
-	if path == "" {
-		return ""
-	}
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[0]
-}
-
-func normalizeBizCode(base string) string {
-	parts := strings.Split(base, "-")
-	for i, p := range parts {
-		parts[i] = singularize(p)
-	}
-	return strings.Join(parts, "_")
-}
-
-func singularize(s string) string {
-	if strings.HasSuffix(s, "ies") && len(s) > 3 {
-		return s[:len(s)-3] + "y"
-	}
-	if strings.HasSuffix(s, "ses") && len(s) > 3 {
-		return s[:len(s)-2]
-	}
-	if strings.HasSuffix(s, "s") && len(s) > 1 {
-		return s[:len(s)-1]
-	}
-	return s
-}
-
-func shouldIgnoreBizBase(base string) bool {
-	ignore := map[string]bool{
-		"login":     true,
-		"workflows": true,
-		"biz-types": true,
-		"logs":      true,
-		"profile":   true,
-	}
-	return ignore[base]
 }
 
 func contains(list []string, target string) bool {
@@ -205,15 +36,6 @@ func contains(list []string, target string) bool {
 		}
 	}
 	return false
-}
-
-func displayNameFromHandlers(handlerFns []string, moduleMap map[string]string) string {
-	for _, fn := range handlerFns {
-		if name := strings.TrimSpace(moduleMap[fn]); name != "" {
-			return name
-		}
-	}
-	return ""
 }
 
 // GetBizTypes 获取所有业务类型（供适用业务下拉使用）

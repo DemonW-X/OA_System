@@ -45,7 +45,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑流程（可视化）' : '新增流程（可视化）'" width="1300px" top="4vh">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '编辑流程' : '新增流程'" width="1300px" top="4vh">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-row :gutter="16">
           <el-col :span="8">
@@ -71,7 +71,7 @@
           <el-input v-model="form.description" />
         </el-form-item>
 
-        <el-divider content-position="left">可视化设计器（新增节点 + 拖拽 + 连线）</el-divider>
+        <el-divider content-position="left">可视化设计器</el-divider>
         <div class="designer-wrap">
           <div class="toolbox">
             <div class="toolbox-title">节点</div>

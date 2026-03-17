@@ -77,11 +77,26 @@
           <el-input-number v-model="form.sort_code" :min="0" style="width:100%" />
         </el-form-item>
         <el-form-item label="是否显示">
-          <el-switch v-model="form.visible" />
+          <div style="display:flex;align-items:center;gap:24px">
+            <el-switch v-model="form.visible" />
+            <span style="color:#606266;font-size:13px">启用审批流</span>
+            <el-switch v-model="form.enable_workflow" />
+          </div>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" />
         </el-form-item>
+        <template v-if="form.enable_workflow">
+          <el-form-item label="业务编码" required>
+            <el-input v-model="form.biz_code" placeholder="如 leave_request、event_booking" />
+          </el-form-item>
+          <el-form-item label="业务名称" required>
+            <el-input v-model="form.biz_name" placeholder="如 请假审批" />
+          </el-form-item>
+          <el-form-item label="排序">
+            <el-input-number v-model="form.biz_sort" :min="0" style="width:100%" />
+          </el-form-item>
+        </template>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -121,7 +136,7 @@ const treeData = ref([])
 const dialogVisible = ref(false)
 const iconDialogVisible = ref(false)
 const iconKeyword = ref('')
-const form = ref({ id: null, name: '', icon: 'Menu', path: '', parent_id: null, sort_code: 0, visible: true, remark: '' })
+const form = ref({ id: null, name: '', icon: 'Menu', path: '', parent_id: null, sort_code: 0, visible: true, remark: '', enable_workflow: false, biz_code: '', biz_name: '', biz_sort: 0 })
 
 const iconList = Object.keys(Icons).sort((a, b) => a.localeCompare(b))
 
@@ -167,7 +182,7 @@ const handleReset = () => {
 
 const openDialog = (row = null) => {
   if (!row) {
-    form.value = { id: null, name: '', icon: 'Menu', path: '', parent_id: 0, sort_code: 0, visible: true, remark: '' }
+    form.value = { id: null, name: '', icon: 'Menu', path: '', parent_id: 0, sort_code: 0, visible: true, remark: '', enable_workflow: false, biz_code: '', biz_name: '', biz_sort: 0 }
   } else {
     form.value = {
       id: row.id,
@@ -177,7 +192,11 @@ const openDialog = (row = null) => {
       parent_id: row.parent_id ?? 0,
       sort_code: row.sort_code || 0,
       visible: row.visible !== false,
-      remark: row.remark || ''
+      remark: row.remark || '',
+      enable_workflow: !!row.enable_workflow,
+      biz_code: row.biz_code || '',
+      biz_name: row.biz_name || '',
+      biz_sort: row.biz_sort || 0
     }
   }
   dialogVisible.value = true
@@ -185,6 +204,9 @@ const openDialog = (row = null) => {
 
 const handleSubmit = async () => {
   if (!form.value.name) return ElMessage.warning('请输入菜单名称')
+  if (form.value.enable_workflow && (!form.value.biz_code || !form.value.biz_name)) {
+    return ElMessage.warning('启用审批流时，业务编码和业务名称不能为空')
+  }
   const payload = {
     name: form.value.name,
     icon: form.value.icon,
@@ -192,7 +214,11 @@ const handleSubmit = async () => {
     parent_id: Number(form.value.parent_id || 0),
     sort_code: Number(form.value.sort_code || 0),
     visible: !!form.value.visible,
-    remark: form.value.remark
+    remark: form.value.remark,
+    enable_workflow: !!form.value.enable_workflow,
+    biz_code: form.value.biz_code || '',
+    biz_name: form.value.biz_name || '',
+    biz_sort: Number(form.value.biz_sort || 0)
   }
   if (form.value.id) await updateMenu(form.value.id, payload)
   else await createMenu(payload)
