@@ -4,8 +4,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span>流程管理（可视化节点拖拽）</span>
         <div style="display:flex;gap:8px">
-          <el-button type="success" @click="openGenerateDialog">按职位生成</el-button>
-          <el-button type="primary" @click="openDialog()">新增流程</el-button>
+<el-button type="primary" @click="openDialog()">新增流程</el-button>
         </div>
       </div>
     </template>
@@ -269,37 +268,15 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="generateDialogVisible" title="按职位生成审批流程" width="500px">
-      <el-form label-width="100px">
-        <el-form-item label="流程名称">
-          <el-input v-model="generateForm.name" placeholder="请输入流程名称" />
-        </el-form-item>
-        <el-form-item label="适用业务">
-          <el-select v-model="generateForm.biz_type" placeholder="请选择业务" style="width:100%">
-            <el-option v-for="b in bizTypes" :key="b.code" :label="b.name" :value="b.code" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="选择部门">
-          <el-select v-model="generateForm.department_id" placeholder="请选择部门" style="width:100%">
-            <el-option v-for="d in departments" :key="d.id" :label="d.name" :value="d.id" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="generateDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleGenerate">生成并编辑</el-button>
-      </template>
-    </el-dialog>
   </el-card>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getBizTypes, generatePositionWorkflow } from '../api/workflow'
+import { getBizTypes } from '../api/workflow'
 import { getEmployees } from '../api/employee'
 import { getPositions } from '../api/position'
-import { getDepartments } from '../api/department'
 import { getOrchidWorkflows, createOrchidWorkflow, updateOrchidWorkflow, deleteOrchidWorkflow } from '../api/orchid_workflow'
 
 const NODE_W = 170
@@ -307,14 +284,11 @@ const NODE_H = 64
 
 const list = ref([])
 const bizTypes = ref([])
-const departments = ref([])
 const employeeOptions = ref([])
 const employeeLoading = ref(false)
 const positionOptions = ref([])
 const positionLoading = ref(false)
 const dialogVisible = ref(false)
-const generateDialogVisible = ref(false)
-const generateForm = ref({ name: '', biz_type: '', department_id: null })
 const formRef = ref()
 const canvasRef = ref()
 
@@ -753,11 +727,6 @@ const loadBizTypes = async () => {
   bizTypes.value = res.data.data || []
 }
 
-const loadDepartments = async () => {
-  const res = await getDepartments({ page: 1, page_size: 1000 })
-  departments.value = res.data.data.list || []
-}
-
 const loadEmployeeOptions = async (keyword = '') => {
   employeeLoading.value = true
   try {
@@ -830,43 +799,6 @@ const openDialog = async (row = null) => {
   dialogVisible.value = true
 }
 
-const openGenerateDialog = () => {
-  generateForm.value = { name: '', biz_type: '', department_id: null }
-  generateDialogVisible.value = true
-}
-
-const handleGenerate = async () => {
-  if (!generateForm.value.name || !generateForm.value.biz_type || !generateForm.value.department_id) {
-    ElMessage.warning('请填写完整信息')
-    return
-  }
-  try {
-    const res = await generatePositionWorkflow(generateForm.value)
-    const data = res.data.data
-    
-    generateDialogVisible.value = false
-    
-    await Promise.all([loadEmployeeOptions(), loadPositionOptions()])
-    
-    const parsed = parseDagToEditor(data.dag_json)
-    form.value = {
-      name: data.name,
-      biz_type: data.biz_type,
-      description: data.description,
-      is_active: true,
-      nodes: parsed.nodes,
-      edges: parsed.edges
-    }
-    clearSelection()
-    connectMode.value = false
-    dialogVisible.value = true
-    
-    ElMessage.success('已生成流程，请检查并保存')
-  } catch (e) {
-    ElMessage.error(e.response?.data?.msg || '生成失败')
-  }
-}
-
 const handleSubmit = async () => {
   await formRef.value.validate()
 
@@ -926,7 +858,6 @@ onMounted(() => {
   loadBizTypes()
   loadEmployeeOptions()
   loadPositionOptions()
-  loadDepartments()
 })
 </script>
 
