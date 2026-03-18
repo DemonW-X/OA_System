@@ -1,23 +1,104 @@
 <template>
   <div>
     <el-row :gutter="20">
-      <!-- 待我审核 -->
+      <!-- 我的审核 -->
       <el-col :span="12" class="panel-col">
         <el-card shadow="hover" class="panel-card">
           <template #header>
             <div style="display:flex;align-items:center;gap:8px">
               <el-icon color="#E6A23C"><Bell /></el-icon>
               <span style="font-weight:bold">我的审核</span>
-              <el-tag size="small" type="warning" style="margin-left:auto">最新 {{ pendingApprovals.length }} 条</el-tag>
-              <el-button link type="primary" @click="openAllApprovalsDialog">更多</el-button>
             </div>
           </template>
-          <el-empty v-if="pendingApprovals.length === 0" description="暂无待审核事项" :image-size="60" />
-          <ul v-else class="approval-list">
-            <li v-for="item in pendingApprovals" :key="item.task_id" class="approval-item">
-              <el-link type="primary" @click="openApproval(item)">{{ item.title }}</el-link>
-            </li>
-          </ul>
+            <el-tabs v-model="approvalActiveTab" @tab-change="onApprovalTabChange" style="margin-top:-8px">
+              <el-tab-pane name="pending">
+                <template #label>
+                  我的待审
+                  <el-badge v-if="pendingApprovals.length > 0" :value="pendingApprovals.length" :max="99" style="margin-left:4px" />
+                </template>
+                <el-empty v-if="pendingApprovals.length === 0" description="暂无待审核事项" :image-size="50" />
+                <ul v-else class="approval-list">
+                  <li v-for="item in pendingApprovals" :key="item.task_id" class="approval-item">
+                    <el-link type="primary" @click="openApproval(item)">{{ item.title }}</el-link>
+                    <span class="approval-meta">{{ item.created_at }}</span>
+                  </li>
+                </ul>
+                <div class="tab-pagination">
+                  <el-pagination
+                    v-model:current-page="pendingPage"
+                    :page-size="pageSize"
+                    :total="pendingTotal"
+                    layout="prev, pager, next"
+                    small
+                    @current-change="loadPending"
+                  />
+                </div>
+              </el-tab-pane>
+
+              <el-tab-pane name="approved" label="我的已审">
+                <el-empty v-if="approvedList.length === 0" description="暂无已审核事项" :image-size="50" />
+                <ul v-else class="approval-list">
+                  <li v-for="item in approvedList" :key="item.task_id" class="approval-item">
+                    <el-link type="primary" @click="openApprovalReadonly(item)">{{ item.title }}</el-link>
+                    <span class="approval-meta">{{ item.created_at }}</span>
+                  </li>
+                </ul>
+                <div class="tab-pagination">
+                  <el-pagination
+                    v-model:current-page="approvedPage"
+                    :page-size="pageSize"
+                    :total="approvedTotal"
+                    layout="prev, pager, next"
+                    small
+                    @current-change="loadApproved"
+                  />
+                </div>
+              </el-tab-pane>
+
+              <el-tab-pane name="pending-read">
+                <template #label>
+                  我的待阅
+                  <el-badge v-if="pendingReadList.length > 0" :value="pendingReadList.length" :max="99" style="margin-left:4px" />
+                </template>
+                <el-empty v-if="pendingReadList.length === 0" description="暂无待阅事项" :image-size="50" />
+                <ul v-else class="approval-list">
+                  <li v-for="item in pendingReadList" :key="item.task_id" class="approval-item">
+                    <el-link type="primary" @click="openApprovalReadonly(item)">{{ item.title }}</el-link>
+                    <span class="approval-meta">{{ item.created_at }}</span>
+                  </li>
+                </ul>
+                <div class="tab-pagination">
+                  <el-pagination
+                    v-model:current-page="pendingReadPage"
+                    :page-size="pageSize"
+                    :total="pendingReadTotal"
+                    layout="prev, pager, next"
+                    small
+                    @current-change="loadPendingRead"
+                  />
+                </div>
+              </el-tab-pane>
+
+              <el-tab-pane name="read" label="我的已阅">
+                <el-empty v-if="readList.length === 0" description="暂无已阅事项" :image-size="50" />
+                <ul v-else class="approval-list">
+                  <li v-for="item in readList" :key="item.task_id" class="approval-item">
+                    <el-link type="primary" @click="openApprovalReadonly(item)">{{ item.title }}</el-link>
+                    <span class="approval-meta">{{ item.created_at }}</span>
+                  </li>
+                </ul>
+                <div class="tab-pagination">
+                  <el-pagination
+                    v-model:current-page="readPage"
+                    :page-size="pageSize"
+                    :total="readTotal"
+                    layout="prev, pager, next"
+                    small
+                    @current-change="loadRead"
+                  />
+                </div>
+              </el-tab-pane>
+            </el-tabs>
         </el-card>
       </el-col>
 
@@ -32,13 +113,13 @@
               <el-button link type="primary" @click="openAllNoticesDialog">更多</el-button>
             </div>
           </template>
-          <el-empty v-if="noticeList.length === 0" description="暂无公告" :image-size="60" />
-          <ul v-else class="notice-list">
-            <li v-for="item in noticeList" :key="item.id" class="notice-item">
-              <el-link type="primary" @click="openNotice(item)">{{ item.title }}</el-link>
-              <span class="notice-meta">{{ item.author }} · {{ formatDate(item.created_at) }}</span>
-            </li>
-          </ul>
+            <el-empty v-if="noticeList.length === 0" description="暂无公告" :image-size="60" />
+            <ul v-else class="notice-list">
+              <li v-for="item in noticeList" :key="item.id" class="notice-item">
+                <el-link type="primary" @click="openNotice(item)">{{ item.title }}</el-link>
+                <span class="notice-meta">{{ item.author }} · {{ formatDate(item.created_at) }}</span>
+              </li>
+            </ul>
         </el-card>
       </el-col>
     </el-row>
@@ -129,11 +210,24 @@ import { getMenus } from '../api/menu'
 import { getBizTypes } from '../api/workflow'
 import { getLeaveRequest, approveLeaveRequest } from '../api/leave_request'
 import { getEventBooking, approveEventBooking } from '../api/event_booking'
-import { getMyPendingApprovals } from '../api/orchid_workflow'
+import { getMyPendingApprovals, getMyApprovedApprovals, getMyPendingReads, getMyReadItems } from '../api/orchid_workflow'
 
 const router = useRouter()
 
 const pendingApprovals = ref([])
+const pendingTotal = ref(0)
+const pendingPage = ref(1)
+const approvedList = ref([])
+const approvedTotal = ref(0)
+const approvedPage = ref(1)
+const pendingReadList = ref([])
+const pendingReadTotal = ref(0)
+const pendingReadPage = ref(1)
+const readList = ref([])
+const readTotal = ref(0)
+const readPage = ref(1)
+const pageSize = 10
+const approvalActiveTab = ref('pending')
 const allPendingApprovals = ref([])
 const noticeList = ref([])
 const allNoticeList = ref([])
@@ -248,6 +342,31 @@ const openApproval = async (item) => {
   }
 }
 
+const openApprovalReadonly = async (item) => {
+  if (!item?.biz_type || !item?.biz_id) return
+  try {
+    let detail = null
+    let summary = ''
+    if (item.biz_type === 'employee') {
+      const res = await getEmployee(item.biz_id)
+      detail = res.data?.data
+      summary = `姓名：${detail?.name || '-'}；部门：${detail?.department?.name || '-'}；职位：${detail?.position_info?.name || '-'}；手机号：${detail?.phone || '-'}`
+    } else if (item.biz_type === 'leave_request') {
+      const res = await getLeaveRequest(item.biz_id)
+      detail = res.data?.data
+      summary = `请假人：${detail?.employee?.name || '-'}；类型：${detail?.type || '-'}；时间：${formatDate(detail?.start_date)} ~ ${formatDate(detail?.end_date)}；天数：${detail?.days ?? '-'}`
+    } else if (item.biz_type === 'event_booking') {
+      const res = await getEventBooking(item.biz_id)
+      detail = res.data?.data
+      summary = `主题：${detail?.title || '-'}；类型：${detail?.type || '-'}；时间：${formatDate(detail?.start_time)} ~ ${formatDate(detail?.end_time)}；会议室：${detail?.meeting_room?.name || '-'}`
+    }
+    approvalDetail.value = { ...item, detail, summary }
+    approvalDialogVisible.value = true
+  } catch {
+    ElMessage.error('获取详情失败')
+  }
+}
+
 const openAllApprovalsDialog = async () => {
   try {
     const res = await getMyPendingApprovals({ limit: 1000 })
@@ -259,12 +378,58 @@ const openAllApprovalsDialog = async () => {
 }
 
 const reloadApprovals = async () => {
-  const [homeRes, allRes] = await Promise.all([
-    getMyPendingApprovals({ limit: 20 }),
-    getMyPendingApprovals({ limit: 1000 })
-  ])
-  pendingApprovals.value = homeRes.data?.data || []
-  allPendingApprovals.value = allRes.data?.data || []
+  await loadPending(pendingPage.value)
+}
+
+const loadPending = async (page = 1) => {
+  pendingPage.value = page
+  try {
+    const res = await getMyPendingApprovals({ page, page_size: pageSize })
+    pendingApprovals.value = res.data?.data?.list || res.data?.data || []
+    pendingTotal.value = res.data?.data?.total || pendingApprovals.value.length
+  } catch {
+    ElMessage.error('【我的待审】获取数据失败')
+  }
+}
+
+const loadApproved = async (page = 1) => {
+  approvedPage.value = page
+  try {
+    const res = await getMyApprovedApprovals({ page, page_size: pageSize })
+    approvedList.value = res.data?.data?.list || res.data?.data || []
+    approvedTotal.value = res.data?.total || res.data?.data?.total || approvedList.value.length
+  } catch {
+    ElMessage.error('【我的已审】获取数据失败')
+  }
+}
+
+const loadPendingRead = async (page = 1) => {
+  pendingReadPage.value = page
+  try {
+    const res = await getMyPendingReads({ page, page_size: pageSize })
+    pendingReadList.value = res.data?.data?.list || res.data?.data || []
+    pendingReadTotal.value = res.data?.total || res.data?.data?.total || pendingReadList.value.length
+  } catch {
+    ElMessage.error('【我的待阅】获取数据失败')
+  }
+}
+
+const loadRead = async (page = 1) => {
+  readPage.value = page
+  try {
+    const res = await getMyReadItems({ page, page_size: pageSize })
+    readList.value = res.data?.data?.list || res.data?.data || []
+    readTotal.value = res.data?.total || res.data?.data?.total || readList.value.length
+  } catch {
+    ElMessage.error('【我的已阅】获取数据失败')
+  }
+}
+
+const onApprovalTabChange = (tab) => {
+  if (tab === 'pending' && pendingApprovals.value.length === 0) loadPending()
+  else if (tab === 'approved' && approvedList.value.length === 0) loadApproved()
+  else if (tab === 'pending-read' && pendingReadList.value.length === 0) loadPendingRead()
+  else if (tab === 'read' && readList.value.length === 0) loadRead()
 }
 
 const submitApproval = async (action) => {
@@ -313,7 +478,7 @@ onMounted(async () => {
 
   const tasks = [
     { key: 'noticesList', label: '公告栏', req: getNotices({ page: 1, page_size: 20, status: 1 }) },
-    { key: 'approvals', label: '待我审核', req: getMyPendingApprovals({ limit: 20 }) }
+    { key: 'approvals', label: '待我审核', req: getMyPendingApprovals({ page: 1, page_size: pageSize }) }
   ]
 
   const results = await Promise.allSettled(tasks.map(t => t.req))
@@ -331,7 +496,8 @@ onMounted(async () => {
         noticeList.value = data?.list || []
         break
       case 'approvals':
-        pendingApprovals.value = data || []
+        pendingApprovals.value = data?.list || data || []
+        pendingTotal.value = data?.total || pendingApprovals.value.length
         break
     }
   })

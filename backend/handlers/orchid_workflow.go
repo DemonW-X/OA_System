@@ -269,22 +269,29 @@ func GetMyPendingApprovals(c *gin.Context) {
 		return
 	}
 
-	limit := atoiDefault(c.DefaultQuery("limit", "20"), 20)
-	if limit <= 0 {
-		limit = 20
+	page := atoiDefault(c.DefaultQuery("page", "1"), 1)
+	pageSize := atoiDefault(c.DefaultQuery("page_size", "10"), 10)
+	if page <= 0 {
+		page = 1
 	}
-	if limit > 1000 {
-		limit = 1000
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
 	}
+	offset := (page - 1) * pageSize
+
+	var total int64
+	database.DB.Model(&models.OrchidWorkflowTask{}).
+		Where("assignee_id = ? AND status = 'open' AND (task_type = 'approve' OR task_type = '')", userID).
+		Count(&total)
 
 	var tasks []models.OrchidWorkflowTask
-	database.DB.Where("assignee_id = ? AND status = 'open'", userID).
+	database.DB.Where("assignee_id = ? AND status = 'open' AND (task_type = 'approve' OR task_type = '')", userID).
 		Order("created_at DESC").
-		Limit(limit).
+		Offset(offset).Limit(pageSize).
 		Find(&tasks)
 
 	if len(tasks) == 0 {
-		c.JSON(http.StatusOK, gin.H{"code": 0, "data": []PendingApprovalItem{}})
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": []PendingApprovalItem{}, "total": total}})
 		return
 	}
 
@@ -319,7 +326,205 @@ func GetMyPendingApprovals(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": items})
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": items, "total": total}})
+}
+
+// 我的已审
+func GetMyApprovedApprovals(c *gin.Context) {
+	userID := c.GetInt("userID")
+	if userID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 1, "msg": "未登录"})
+		return
+	}
+
+	page := atoiDefault(c.DefaultQuery("page", "1"), 1)
+	pageSize := atoiDefault(c.DefaultQuery("page_size", "10"), 10)
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	var total int64
+	database.DB.Model(&models.OrchidWorkflowTask{}).
+		Where("assignee_id = ? AND status IN ('done','transferred','skipped') AND (task_type = 'approve' OR task_type = '')", userID).
+		Count(&total)
+
+	var tasks []models.OrchidWorkflowTask
+	database.DB.Where("assignee_id = ? AND status IN ('done','transferred','skipped') AND (task_type = 'approve' OR task_type = '')", userID).
+		Order("updated_at DESC").
+		Offset(offset).Limit(pageSize).
+		Find(&tasks)
+
+	if len(tasks) == 0 {
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": []PendingApprovalItem{}, "total": total}})
+		return
+	}
+
+	instanceIDs := make([]int, 0, len(tasks))
+	for _, t := range tasks {
+		instanceIDs = append(instanceIDs, t.InstanceID)
+	}
+	var instances []models.OrchidWorkflowInstance
+	database.DB.Where("id IN ?", instanceIDs).Find(&instances)
+	insMap := map[int]models.OrchidWorkflowInstance{}
+	for _, ins := range instances {
+		insMap[ins.ID] = ins
+	}
+
+	items := make([]PendingApprovalItem, 0, len(tasks))
+	for _, t := range tasks {
+		ins, ok := insMap[t.InstanceID]
+		if !ok {
+			continue
+		}
+		items = append(items, PendingApprovalItem{
+			TaskID:     t.ID,
+			BizType:    ins.BizType,
+			BizID:      ins.BizID,
+			NodeKey:    t.NodeKey,
+			Title:      buildApprovalTitle(ins),
+			Status:     ins.Status,
+			CreatedAt:  t.CreatedAt.Format(timeLayout),
+			DetailPath: buildApprovalDetailPath(ins.BizType, ins.BizID),
+			InstanceID: ins.ID,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": items, "total": total}})
+}
+
+// 我的待阅
+func GetMyPendingReads(c *gin.Context) {
+	userID := c.GetInt("userID")
+	if userID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 1, "msg": "未登录"})
+		return
+	}
+
+	page := atoiDefault(c.DefaultQuery("page", "1"), 1)
+	pageSize := atoiDefault(c.DefaultQuery("page_size", "10"), 10)
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	var total int64
+	database.DB.Model(&models.OrchidWorkflowTask{}).
+		Where("assignee_id = ? AND task_type = 'read' AND read_at IS NULL", userID).
+		Count(&total)
+
+	var tasks []models.OrchidWorkflowTask
+	database.DB.Where("assignee_id = ? AND task_type = 'read' AND read_at IS NULL", userID).
+		Order("created_at DESC").
+		Offset(offset).Limit(pageSize).
+		Find(&tasks)
+
+	if len(tasks) == 0 {
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": []PendingApprovalItem{}, "total": total}})
+		return
+	}
+
+	instanceIDs := make([]int, 0, len(tasks))
+	for _, t := range tasks {
+		instanceIDs = append(instanceIDs, t.InstanceID)
+	}
+	var instances []models.OrchidWorkflowInstance
+	database.DB.Where("id IN ?", instanceIDs).Find(&instances)
+	insMap := map[int]models.OrchidWorkflowInstance{}
+	for _, ins := range instances {
+		insMap[ins.ID] = ins
+	}
+
+	items := make([]PendingApprovalItem, 0, len(tasks))
+	for _, t := range tasks {
+		ins, ok := insMap[t.InstanceID]
+		if !ok {
+			continue
+		}
+		items = append(items, PendingApprovalItem{
+			TaskID:     t.ID,
+			BizType:    ins.BizType,
+			BizID:      ins.BizID,
+			NodeKey:    t.NodeKey,
+			Title:      buildApprovalTitle(ins),
+			Status:     ins.Status,
+			CreatedAt:  t.CreatedAt.Format(timeLayout),
+			DetailPath: buildApprovalDetailPath(ins.BizType, ins.BizID),
+			InstanceID: ins.ID,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": items, "total": total})
+}
+
+// 我的已阅
+func GetMyReadItems(c *gin.Context) {
+	userID := c.GetInt("userID")
+	if userID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 1, "msg": "未登录"})
+		return
+	}
+
+	page := atoiDefault(c.DefaultQuery("page", "1"), 1)
+	pageSize := atoiDefault(c.DefaultQuery("page_size", "10"), 10)
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	var total int64
+	database.DB.Model(&models.OrchidWorkflowTask{}).
+		Where("assignee_id = ? AND task_type = 'read' AND read_at IS NOT NULL", userID).
+		Count(&total)
+
+	var tasks []models.OrchidWorkflowTask
+	database.DB.Where("assignee_id = ? AND task_type = 'read' AND read_at IS NOT NULL", userID).
+		Order("read_at DESC").
+		Offset(offset).Limit(pageSize).
+		Find(&tasks)
+
+	if len(tasks) == 0 {
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": []PendingApprovalItem{}, "total": total}})
+		return
+	}
+
+	instanceIDs := make([]int, 0, len(tasks))
+	for _, t := range tasks {
+		instanceIDs = append(instanceIDs, t.InstanceID)
+	}
+	var instances []models.OrchidWorkflowInstance
+	database.DB.Where("id IN ?", instanceIDs).Find(&instances)
+	insMap := map[int]models.OrchidWorkflowInstance{}
+	for _, ins := range instances {
+		insMap[ins.ID] = ins
+	}
+
+	items := make([]PendingApprovalItem, 0, len(tasks))
+	for _, t := range tasks {
+		ins, ok := insMap[t.InstanceID]
+		if !ok {
+			continue
+		}
+		items = append(items, PendingApprovalItem{
+			TaskID:     t.ID,
+			BizType:    ins.BizType,
+			BizID:      ins.BizID,
+			NodeKey:    t.NodeKey,
+			Title:      buildApprovalTitle(ins),
+			Status:     ins.Status,
+			CreatedAt:  t.CreatedAt.Format(timeLayout),
+			DetailPath: buildApprovalDetailPath(ins.BizType, ins.BizID),
+			InstanceID: ins.ID,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": items, "total": total}})
 }
 
 func TransferOrchidWorkflowTask(c *gin.Context) {

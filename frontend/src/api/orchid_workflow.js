@@ -8,6 +8,9 @@ export const deleteOrchidWorkflow = (id) => http.delete(`/orchid-workflows/${id}
 
 export const getOrchidWorkflowHistories = (params) => http.get('/orchid-workflow-histories', { params })
 export const getMyPendingApprovals = (params) => http.get('/approvals/pending', { params })
+export const getMyApprovedApprovals = (params) => http.get('/approvals/approved', { params })
+export const getMyPendingReads = (params) => http.get('/approvals/pending-read', { params })
+export const getMyReadItems = (params) => http.get('/approvals/read', { params })
 export const transferOrchidWorkflowTask = (params, data) => http.post('/orchid-workflow-transfer', data, { params })
 export const skipOrchidWorkflowNode = (params, data) => http.post('/orchid-workflow-skip', data, { params })
 export const seedOrchidWorkflowTemplates = () => http.post('/orchid-workflow-seed')

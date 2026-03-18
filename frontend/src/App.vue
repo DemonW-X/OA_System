@@ -6,14 +6,14 @@
         {{ isCollapsed ? 'OA' : 'OA系统' }}
       </div>
       <el-menu
-        router
-        :default-active="route.path"
+        :default-active="currentTab"
         :collapse="isCollapsed"
         :collapse-transition="false"
         background-color="#304156"
         text-color="#bfcbd9"
         active-text-color="#409EFF"
         class="sidebar-menu"
+        @select="onMenuSelect"
       >
         <MenuNode v-for="m in menus" :key="m.id" :node="m" :resolve-icon="resolveIcon" :is-collapsed="isCollapsed" />
       </el-menu>
@@ -25,8 +25,8 @@
         </el-tooltip>
       </div>
     </el-aside>
-    <el-container>
-      <el-header style="background:#fff;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:flex-end">
+    <el-container style="overflow:hidden">
+      <el-header style="background:#fff;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:flex-end;padding:0 16px">
         <el-dropdown @command="handleCommand">
           <span style="cursor:pointer;display:flex;align-items:center;gap:6px">
             <el-avatar :size="28" style="background:#409EFF">{{ userInfo.real_name?.[0] || 'U' }}</el-avatar>
@@ -45,8 +45,31 @@
           </template>
         </el-dropdown>
       </el-header>
-      <el-main style="background:#f0f2f5">
-        <router-view />
+
+      <!-- 多页签栏 -->
+      <div class="tabs-bar">
+        <el-tabs
+          v-model="currentTab"
+          type="card"
+          closable
+          @tab-click="onTabClick"
+          @tab-remove="onTabRemove"
+          class="main-tabs"
+        >
+          <el-tab-pane
+            v-for="tab in openTabs"
+            :key="tab.path"
+            :label="tab.title"
+            :name="tab.path"
+            :closable="tab.path !== '/dashboard'"
+          />
+        </el-tabs>
+      </div>
+
+      <el-main style="background:#f0f2f5;overflow:auto">
+        <keep-alive>
+          <component :is="currentComponent" :key="currentTab" />
+        </keep-alive>
       </el-main>
     </el-container>
   </el-container>
@@ -54,8 +77,6 @@
   <!-- 设置弹窗 -->
   <el-dialog v-model="settingsVisible" title="个人设置" width="560px" @open="onSettingsOpen">
     <el-tabs v-model="activeTab" tab-position="left" style="min-height:200px">
-
-      <!-- 基本信息 -->
       <el-tab-pane label="基本信息" name="profile">
         <el-form :model="profileForm" :rules="profileRules" ref="profileFormRef" label-width="90px" style="margin-top:10px">
           <el-form-item label="用户名" prop="username">
@@ -70,8 +91,6 @@
           <el-button type="primary" :loading="savingProfile" @click="handleSaveProfile">保存</el-button>
         </div>
       </el-tab-pane>
-
-      <!-- 修改密码 -->
       <el-tab-pane label="修改密码" name="password">
         <el-form :model="pwdForm" :rules="pwdRules" ref="pwdFormRef" label-width="90px" style="margin-top:10px">
           <el-form-item label="原密码" prop="old_password">
@@ -95,13 +114,12 @@
           <el-button type="primary" :loading="savingPwd" @click="handleChangePassword">确认修改</el-button>
         </div>
       </el-tab-pane>
-
     </el-tabs>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, defineComponent, h, resolveComponent } from 'vue'
+import { ref, computed, onMounted, watch, defineComponent, h, resolveComponent, shallowRef } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Icons from '@element-plus/icons-vue'
@@ -113,6 +131,79 @@ const route = useRoute()
 
 const isCollapsed = ref(false)
 const menus = ref([])
+
+// 路由path -> 组件 映射
+const routeComponentMap = {
+  '/dashboard':                 () => import('./views/Dashboard.vue'),
+  '/department':                () => import('./views/Department.vue'),
+  '/employee':                  () => import('./views/Employee.vue'),
+  '/notice':                    () => import('./views/Notice.vue'),
+  '/log':                       () => import('./views/OperationLog.vue'),
+  '/meeting-room':              () => import('./views/MeetingRoom.vue'),
+  '/event-booking':             () => import('./views/EventBooking.vue'),
+  '/leave-request':             () => import('./views/LeaveRequest.vue'),
+  '/resignation':               () => import('./views/Resignation.vue'),
+  '/onboarding':                () => import('./views/Onboarding.vue'),
+  '/workflow':                  () => import('./views/Workflow.vue'),
+  '/menu':                      () => import('./views/Menu.vue'),
+  '/employee-menu-permission':  () => import('./views/EmployeeMenuPermission.vue'),
+  '/schedule':                  () => import('./views/Schedule.vue'),
+  '/role':                      () => import('./views/Role.vue'),
+}
+
+// 多页签状态
+const openTabs = ref([{ path: '/dashboard', title: '首页' }])
+const currentTab = ref('/dashboard')
+const componentCache = shallowRef({})
+
+const currentComponent = computed(() => componentCache.value[currentTab.value] || null)
+
+const loadComponent = async (path) => {
+  if (componentCache.value[path]) return
+  const loader = routeComponentMap[path]
+  if (!loader) return
+  const mod = await loader()
+  componentCache.value = { ...componentCache.value, [path]: mod.default }
+}
+
+const onMenuSelect = async (path) => {
+  if (!routeComponentMap[path]) return
+  const exists = openTabs.value.find(t => t.path === path)
+  if (!exists) {
+    // 从菜单树中找标题
+    const title = findMenuTitle(menus.value, path) || path
+    openTabs.value.push({ path, title })
+  }
+  currentTab.value = path
+  await loadComponent(path)
+}
+
+const findMenuTitle = (nodes, path) => {
+  for (const n of nodes) {
+    if (n.path === path) return n.name
+    if (n.children?.length) {
+      const found = findMenuTitle(n.children, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const onTabClick = (tab) => {
+  currentTab.value = tab.props.name
+}
+
+const onTabRemove = (path) => {
+  const idx = openTabs.value.findIndex(t => t.path === path)
+  openTabs.value.splice(idx, 1)
+  if (currentTab.value === path) {
+    currentTab.value = openTabs.value[Math.max(0, idx - 1)].path
+  }
+  // 清理缓存
+  const cache = { ...componentCache.value }
+  delete cache[path]
+  componentCache.value = cache
+}
 
 const resolveIcon = (iconName) => {
   if (iconName && Icons[iconName]) return Icons[iconName]
@@ -314,7 +405,10 @@ const handleCommand = async (cmd) => {
 }
 
 onMounted(() => {
-  if (route.path !== '/login') loadMenus()
+  if (route.path !== '/login') {
+    loadMenus()
+    loadComponent('/dashboard')
+  }
 })
 
 watch(() => route.path, (newPath, oldPath) => {
@@ -334,16 +428,32 @@ watch(() => route.path, (newPath, oldPath) => {
 .sidebar-logo {
   color: #fff;
   font-size: 18px;
-  padding: 20px 8px;
+  padding: 20px 12px;
   text-align: center;
   font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-menu {
   flex: 1;
   border-right: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sidebar-bottom {
@@ -406,5 +516,37 @@ watch(() => route.path, (newPath, oldPath) => {
 }
 .captcha-box:hover {
   background: #e0f0ff;
+}
+
+.tabs-bar {
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  padding: 0 8px;
+}
+
+.main-tabs {
+  height: 40px;
+}
+
+:deep(.main-tabs .el-tabs__header) {
+  margin: 0;
+  border-bottom: none;
+}
+
+:deep(.main-tabs .el-tabs__nav) {
+  border: none;
+}
+
+:deep(.main-tabs .el-tabs__item) {
+  height: 40px;
+  line-height: 40px;
+  border: 1px solid #e4e7ed !important;
+  margin-right: 4px;
+  border-radius: 4px 4px 0 0;
+}
+
+:deep(.main-tabs .el-tabs__item.is-active) {
+  background: #f0f2f5;
+  border-bottom-color: #f0f2f5 !important;
 }
 </style>
