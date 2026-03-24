@@ -104,13 +104,43 @@ func buildMenuTree(list []models.Menu) []MenuTreeItem {
 }
 
 func GetMenus(c *gin.Context) {
+	kw := strings.TrimSpace(c.Query("keyword"))
+	useCache := kw == "" && c.DefaultQuery("tree", "1") == "1"
+
+	if useCache {
+		employeeID, needFilter := resolveMenuFilterEmployeeID(c)
+		if needFilter && employeeID <= 0 {
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
+			return
+		}
+		if cached := getMenuTreeCache(employeeID); cached != nil {
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": cached})
+			return
+		}
+		var list []models.Menu
+		query := database.DB.Model(&models.Menu{})
+		if needFilter {
+			ids := getEmployeeAssignedMenuIDs(employeeID)
+			if len(ids) == 0 {
+				c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
+				return
+			}
+			query = query.Where("id IN ?", ids)
+		}
+		query.Order("sort_code asc, id asc").Find(&list)
+		tree := buildMenuTree(list)
+		setMenuTreeCache(employeeID, tree)
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": tree})
+		return
+	}
+
+	// 有关键词或非树形模式，不走缓存
 	var list []models.Menu
 	query := database.DB.Model(&models.Menu{})
-	if kw := strings.TrimSpace(c.Query("keyword")); kw != "" {
+	if kw != "" {
 		like := "%" + kw + "%"
 		query = query.Where("name LIKE ? OR path LIKE ?", like, like)
 	}
-
 	if q, empty := applyMenuPermissionScope(c, query); empty {
 		if c.DefaultQuery("tree", "1") == "1" {
 			c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
@@ -121,9 +151,7 @@ func GetMenus(c *gin.Context) {
 	} else {
 		query = q
 	}
-
 	query.Order("sort_code asc, id asc").Find(&list)
-
 	if c.DefaultQuery("tree", "1") == "1" {
 		c.JSON(http.StatusOK, gin.H{"code": 0, "data": buildMenuTree(list)})
 		return
@@ -176,6 +204,7 @@ func CreateMenu(c *gin.Context) {
 	}
 	// 同步审批流配置
 	syncMenuWorkflowConfig(m.ID, req.EnableWorkflow, req.BizCode, req.BizName, req.BizSort)
+	InvalidateAllMenuCache()
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 	writeLog(c, "菜单管理", "新增", "新增菜单："+req.Name)
 }
@@ -222,6 +251,7 @@ func UpdateMenu(c *gin.Context) {
 	}
 	// 同步审批流配置
 	syncMenuWorkflowConfig(m.ID, req.EnableWorkflow, req.BizCode, req.BizName, req.BizSort)
+	InvalidateAllMenuCache()
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 	writeLog(c, "菜单管理", "修改", "修改菜单："+req.Name)
 }
@@ -247,6 +277,7 @@ func DeleteMenu(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "删除失败"})
 		return
 	}
+	InvalidateAllMenuCache()
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
 	writeLog(c, "菜单管理", "删除", "删除菜单："+m.Name)
 }
@@ -351,7 +382,7 @@ func SetEmployeeMenuPermissions(c *gin.Context) {
 		}
 	}
 	tx.Commit()
-
+	InvalidateMenuCache(employeeID)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"employee_id": employeeID, "checked_menu_ids": ids}})
 	writeLog(c, "员工权限", "分配", "设置员工菜单权限："+emp.Name)
 }
