@@ -8,6 +8,7 @@
             <div style="display:flex;align-items:center;gap:8px">
               <el-icon color="#E6A23C"><Bell /></el-icon>
               <span style="font-weight:bold">我的审核</span>
+              <el-button link type="primary" style="margin-left:auto" @click="openAllAuditDialog">更多</el-button>
             </div>
           </template>
             <el-tabs v-model="approvalActiveTab" @tab-change="onApprovalTabChange" style="margin-top:-8px">
@@ -124,6 +125,62 @@
       </el-col>
     </el-row>
 
+    <!-- 全部审核弹窗 -->
+    <el-dialog v-model="allAuditDialogVisible" width="860px" title="我的审核" destroy-on-close>
+      <el-tabs v-model="allAuditActiveTab" @tab-change="onAllAuditTabChange">
+        <el-tab-pane name="pending">
+          <template #label>我的待审<el-badge v-if="allAuditPendingTotal > 0" :value="allAuditPendingTotal" :max="99" style="margin-left:4px" /></template>
+          <el-empty v-if="allAuditPendingList.length === 0" description="暂无待审核事项" :image-size="50" />
+          <ul v-else class="approval-list all-audit-list">
+            <li v-for="item in allAuditPendingList" :key="item.task_id" class="approval-item">
+              <el-link type="primary" @click="openApproval(item)">{{ item.title }}</el-link>
+              <span class="approval-meta">{{ item.created_at }}</span>
+            </li>
+          </ul>
+          <div class="tab-pagination">
+            <el-pagination v-model:current-page="allAuditPendingPage" :page-size="allAuditPageSize" :total="allAuditPendingTotal" layout="prev, pager, next" small @current-change="loadAllAuditPending" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane name="approved" label="我的已审">
+          <el-empty v-if="allAuditApprovedList.length === 0" description="暂无已审核事项" :image-size="50" />
+          <ul v-else class="approval-list all-audit-list">
+            <li v-for="item in allAuditApprovedList" :key="item.task_id" class="approval-item">
+              <el-link type="primary" @click="openApprovalReadonly(item)">{{ item.title }}</el-link>
+              <span class="approval-meta">{{ item.created_at }}</span>
+            </li>
+          </ul>
+          <div class="tab-pagination">
+            <el-pagination v-model:current-page="allAuditApprovedPage" :page-size="allAuditPageSize" :total="allAuditApprovedTotal" layout="prev, pager, next" small @current-change="loadAllAuditApproved" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane name="pending-read">
+          <template #label>我的待阅<el-badge v-if="allAuditPendingReadTotal > 0" :value="allAuditPendingReadTotal" :max="99" style="margin-left:4px" /></template>
+          <el-empty v-if="allAuditPendingReadList.length === 0" description="暂无待阅事项" :image-size="50" />
+          <ul v-else class="approval-list all-audit-list">
+            <li v-for="item in allAuditPendingReadList" :key="item.task_id" class="approval-item">
+              <el-link type="primary" @click="openApprovalReadonly(item)">{{ item.title }}</el-link>
+              <span class="approval-meta">{{ item.created_at }}</span>
+            </li>
+          </ul>
+          <div class="tab-pagination">
+            <el-pagination v-model:current-page="allAuditPendingReadPage" :page-size="allAuditPageSize" :total="allAuditPendingReadTotal" layout="prev, pager, next" small @current-change="loadAllAuditPendingRead" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane name="read" label="我的已阅">
+          <el-empty v-if="allAuditReadList.length === 0" description="暂无已阅事项" :image-size="50" />
+          <ul v-else class="approval-list all-audit-list">
+            <li v-for="item in allAuditReadList" :key="item.task_id" class="approval-item">
+              <el-link type="primary" @click="openApprovalReadonly(item)">{{ item.title }}</el-link>
+              <span class="approval-meta">{{ item.created_at }}</span>
+            </li>
+          </ul>
+          <div class="tab-pagination">
+            <el-pagination v-model:current-page="allAuditReadPage" :page-size="allAuditPageSize" :total="allAuditReadTotal" layout="prev, pager, next" small @current-change="loadAllAuditRead" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
+
     <!-- 全部待审核弹窗 -->
     <el-dialog v-model="allApprovalsDialogVisible" width="900px" title="全部待审核事项">
       <el-empty v-if="allPendingApprovals.length === 0" description="暂无待审核事项" :image-size="60" />
@@ -143,7 +200,7 @@
         <el-descriptions-item label="详情信息">{{ approvalDetail.summary || '-' }}</el-descriptions-item>
       </el-descriptions>
 
-      <el-form :model="approvalForm" label-width="80px" style="margin-top:16px">
+      <el-form v-if="!approvalDetail?.readonly" :model="approvalForm" label-width="80px" style="margin-top:16px">
         <el-form-item label="审核动作">
           <el-radio-group v-model="approvalForm.action">
             <el-radio label="approved">通过</el-radio>
@@ -161,9 +218,11 @@
       </el-form>
 
       <template #footer>
-        <el-button @click="approvalDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="approvalSubmitting" @click="submitApproval('approved')">审核通过</el-button>
-        <el-button type="danger" plain :loading="approvalSubmitting" @click="submitApproval('rejected')">拒绝</el-button>
+        <el-button @click="approvalDialogVisible = false">关闭</el-button>
+        <template v-if="!approvalDetail?.readonly">
+          <el-button type="primary" :loading="approvalSubmitting" @click="submitApproval('approved')">审核通过</el-button>
+          <el-button type="danger" plain :loading="approvalSubmitting" @click="submitApproval('rejected')">拒绝</el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -233,6 +292,21 @@ const noticeList = ref([])
 const allNoticeList = ref([])
 const allApprovalsDialogVisible = ref(false)
 const allNoticesDialogVisible = ref(false)
+const allAuditDialogVisible = ref(false)
+const allAuditActiveTab = ref('pending')
+const allAuditPageSize = 20
+const allAuditPendingList = ref([])
+const allAuditPendingTotal = ref(0)
+const allAuditPendingPage = ref(1)
+const allAuditApprovedList = ref([])
+const allAuditApprovedTotal = ref(0)
+const allAuditApprovedPage = ref(1)
+const allAuditPendingReadList = ref([])
+const allAuditPendingReadTotal = ref(0)
+const allAuditPendingReadPage = ref(1)
+const allAuditReadList = ref([])
+const allAuditReadTotal = ref(0)
+const allAuditReadPage = ref(1)
 const approvalDialogVisible = ref(false)
 const approvalDetail = ref(null)
 const approvalForm = ref({ action: 'approved', remark: '' })
@@ -432,6 +506,55 @@ const onApprovalTabChange = (tab) => {
   else if (tab === 'read' && readList.value.length === 0) loadRead()
 }
 
+const loadAllAuditPending = async (page = 1) => {
+  allAuditPendingPage.value = page
+  try {
+    const res = await getMyPendingApprovals({ page, page_size: allAuditPageSize })
+    allAuditPendingList.value = res.data?.data?.list || res.data?.data || []
+    allAuditPendingTotal.value = res.data?.data?.total || allAuditPendingList.value.length
+  } catch { ElMessage.error('获取待审数据失败') }
+}
+
+const loadAllAuditApproved = async (page = 1) => {
+  allAuditApprovedPage.value = page
+  try {
+    const res = await getMyApprovedApprovals({ page, page_size: allAuditPageSize })
+    allAuditApprovedList.value = res.data?.data?.list || res.data?.data || []
+    allAuditApprovedTotal.value = res.data?.data?.total || allAuditApprovedList.value.length
+  } catch { ElMessage.error('获取已审数据失败') }
+}
+
+const loadAllAuditPendingRead = async (page = 1) => {
+  allAuditPendingReadPage.value = page
+  try {
+    const res = await getMyPendingReads({ page, page_size: allAuditPageSize })
+    allAuditPendingReadList.value = res.data?.data?.list || res.data?.data || []
+    allAuditPendingReadTotal.value = res.data?.data?.total || allAuditPendingReadList.value.length
+  } catch { ElMessage.error('获取待阅数据失败') }
+}
+
+const loadAllAuditRead = async (page = 1) => {
+  allAuditReadPage.value = page
+  try {
+    const res = await getMyReadItems({ page, page_size: allAuditPageSize })
+    allAuditReadList.value = res.data?.data?.list || res.data?.data || []
+    allAuditReadTotal.value = res.data?.data?.total || allAuditReadList.value.length
+  } catch { ElMessage.error('获取已阅数据失败') }
+}
+
+const openAllAuditDialog = async () => {
+  allAuditActiveTab.value = 'pending'
+  allAuditDialogVisible.value = true
+  await loadAllAuditPending(1)
+}
+
+const onAllAuditTabChange = (tab) => {
+  if (tab === 'pending') loadAllAuditPending(1)
+  else if (tab === 'approved') loadAllAuditApproved(1)
+  else if (tab === 'pending-read') loadAllAuditPendingRead(1)
+  else if (tab === 'read') loadAllAuditRead(1)
+}
+
 const submitApproval = async (action) => {
   if (!approvalDetail.value?.biz_type || !approvalDetail.value?.biz_id) return
 
@@ -538,6 +661,10 @@ onMounted(async () => {
 .all-approval-list {
   max-height: 520px;
   overflow: auto;
+}
+
+.all-audit-list {
+  min-height: 200px;
 }
 
 .notice-meta {

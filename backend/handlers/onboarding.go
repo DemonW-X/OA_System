@@ -93,6 +93,14 @@ func CreateOnboarding(c *gin.Context) {
 	}
 	probationEnd := onboardDate.AddDate(0, 0, probationDays)
 
+	// 检查是否存在相同身份证号的记录（无论任何状态）
+	var existCount int64
+	database.DB.Model(&models.Onboarding{}).Where("id_card = ?", req.IDCard).Count(&existCount)
+	if existCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "该身份证号已存在入职申请记录，请勿重复提交"})
+		return
+	}
+
 	item := models.Onboarding{
 		EmployeeName:   req.EmployeeName,
 		OnboardDate:    onboardDate,

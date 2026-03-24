@@ -225,7 +225,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
+        <el-button type="primary" @click="handleSubmit" :disabled="submitting" :loading="submitting">确定</el-button>
       </template>
     </el-dialog>
 
@@ -437,14 +437,14 @@ const handleSubmit = async () => {
   // null 转 0，避免 Go int 类型解析失败
   if (!payload.department_id) payload.department_id = 0
   if (!payload.position_id) payload.position_id = 0
-  if (id) {
-    await updateOnboarding(id, payload)
-  } else {
-    await createOnboarding(payload)
-  }
-  ElMessage.success('操作成功')
-  dialogVisible.value = false
-  loadData()
+    if (id) {
+      await updateOnboarding(id, payload)
+    } else {
+      await createOnboarding(payload)
+    }
+    ElMessage.success('操作成功')
+    dialogVisible.value = false
+    loadData()
 }
 
 const handleSubmitAudit = async (row) => {
