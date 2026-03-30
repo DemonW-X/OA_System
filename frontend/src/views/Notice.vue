@@ -1,13 +1,6 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>公告管理</span>
-        <el-button type="primary" @click="openDialog()">新增公告</el-button>
-      </div>
-    </template>
-
-    <el-form :inline="true" style="margin-bottom:16px">
+  <el-card shadow="never" style="border:none">
+    <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="标题">
         <el-input v-model="query.title" placeholder="请输入标题" clearable />
       </el-form-item>

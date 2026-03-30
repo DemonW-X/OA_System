@@ -1,11 +1,5 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>员工菜单权限分配</span>
-      </div>
-    </template>
-
+  <el-card shadow="never" style="border:none">
     <el-form :inline="true" style="margin-bottom:16px">
       <el-form-item label="姓名">
         <el-input v-model="query.name" placeholder="请输入姓名" clearable />

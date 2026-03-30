@@ -1,10 +1,6 @@
 <template>
-  <el-card>
-    <template #header>
-      <span>员工管理</span>
-    </template>
-
-    <el-form :inline="true" style="margin-bottom:16px">
+  <el-card shadow="never" style="border:none">
+    <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="姓名">
         <el-input v-model="query.name" placeholder="请输入姓名" clearable />
       </el-form-item>

@@ -1,13 +1,6 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>离职管理</span>
-        <el-button type="primary" @click="openDialog()">新增离职</el-button>
-      </div>
-    </template>
-
-    <el-form :inline="true" style="margin-bottom:16px">
+  <el-card shadow="never" style="border:none">
+    <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="员工">
         <el-input v-model="query.employee_name" placeholder="输入姓名搜索" clearable style="width:180px" />
       </el-form-item>
@@ -22,6 +15,9 @@
       <el-form-item>
         <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
+      </el-form-item>
+      <el-form-item style="margin-left:auto;margin-right:0">
+        <el-button type="primary" @click="openDialog()">新增离职</el-button>
       </el-form-item>
     </el-form>
 

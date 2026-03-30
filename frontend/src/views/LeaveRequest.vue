@@ -1,13 +1,6 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>请假管理</span>
-        <el-button type="primary" @click="openDialog()">新增请假</el-button>
-      </div>
-    </template>
-
-    <el-form :inline="true" style="margin-bottom:16px">
+  <el-card shadow="never" style="border:none">
+    <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="员工">
         <el-input v-model="query.employee_name" placeholder="输入姓名搜索" clearable style="width:140px" />
       </el-form-item>

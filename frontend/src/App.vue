@@ -152,16 +152,8 @@ const routeComponentMap = {
 }
 
 // 多页签状态
-const TABS_STORAGE_KEY = 'oa_open_tabs'
-const CURRENT_TAB_STORAGE_KEY = 'oa_current_tab'
-
-const _savedTabs = (() => {
-  try { return JSON.parse(localStorage.getItem(TABS_STORAGE_KEY)) } catch { return null }
-})()
-const _savedCurrent = localStorage.getItem(CURRENT_TAB_STORAGE_KEY)
-
-const openTabs = ref((_savedTabs?.length ? _savedTabs : [{ path: '/dashboard', title: '首页' }]))
-const currentTab = ref(_savedCurrent && openTabs.value.find(t => t.path === _savedCurrent) ? _savedCurrent : '/dashboard')
+const openTabs = ref([{ path: '/dashboard', title: '首页' }])
+const currentTab = ref('/dashboard')
 const componentCache = shallowRef({})
 
 const currentComponent = computed(() => componentCache.value[currentTab.value] || null)
@@ -183,8 +175,6 @@ const onMenuSelect = async (path) => {
     openTabs.value.push({ path, title })
   }
   currentTab.value = path
-  localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(openTabs.value))
-  localStorage.setItem(CURRENT_TAB_STORAGE_KEY, path)
   await loadComponent(path)
 }
 
@@ -201,7 +191,6 @@ const findMenuTitle = (nodes, path) => {
 
 const onTabClick = (tab) => {
   currentTab.value = tab.props.name
-  localStorage.setItem(CURRENT_TAB_STORAGE_KEY, tab.props.name)
 }
 
 const onTabRemove = (path) => {
@@ -214,8 +203,6 @@ const onTabRemove = (path) => {
   const cache = { ...componentCache.value }
   delete cache[path]
   componentCache.value = cache
-  localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(openTabs.value))
-  localStorage.setItem(CURRENT_TAB_STORAGE_KEY, currentTab.value)
 }
 
 const resolveIcon = (iconName) => {
@@ -413,8 +400,6 @@ const handleCommand = async (cmd) => {
     await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
-    localStorage.removeItem(TABS_STORAGE_KEY)
-    localStorage.removeItem(CURRENT_TAB_STORAGE_KEY)
     router.push('/login')
   }
 }

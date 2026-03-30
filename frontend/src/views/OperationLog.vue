@@ -1,9 +1,5 @@
 <template>
-  <el-card>
-    <template #header>
-      <span>操作日志</span>
-    </template>
-
+  <el-card shadow="never" style="border:none">
     <el-form :inline="true" style="margin-bottom:16px">
       <el-form-item label="操作人">
         <el-input v-model="query.username" placeholder="请输入操作人" clearable />

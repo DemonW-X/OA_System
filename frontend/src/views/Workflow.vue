@@ -1,15 +1,6 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>流程管理（可视化节点拖拽）</span>
-        <div style="display:flex;gap:8px">
-<el-button type="primary" @click="openDialog()">新增流程</el-button>
-        </div>
-      </div>
-    </template>
-
-    <el-form :inline="true" style="margin-bottom:16px">
+  <el-card shadow="never" style="border:none">
+    <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="流程名称">
         <el-input v-model="query.name" placeholder="请输入流程名称" clearable />
       </el-form-item>
@@ -21,6 +12,9 @@
       <el-form-item>
         <el-button type="primary" @click="loadData">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
+      </el-form-item>
+      <el-form-item style="margin-left:auto;margin-right:0">
+        <el-button type="primary" @click="openDialog()">新增流程</el-button>
       </el-form-item>
     </el-form>
 

@@ -1,13 +1,6 @@
 <template>
-  <el-card shadow="never">
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>菜单管理</span>
-        <el-button type="primary" @click="openDialog()">新增菜单</el-button>
-      </div>
-    </template>
-
-    <el-form :inline="true" style="margin-bottom:16px">
+  <el-card shadow="never" style="border:none">
+    <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="关键字">
         <el-input v-model="query.keyword" placeholder="菜单名称/路径" clearable />
       </el-form-item>
