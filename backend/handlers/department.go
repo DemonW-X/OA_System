@@ -63,6 +63,44 @@ func updateChildrenDepartmentLevel(parentID int, parentLevel int) {
 	}
 }
 
+func GetDepartments(c *gin.Context) {
+	var list []models.Department
+	query := database.DB.Model(&models.Department{}).Preload("Parent")
+	if name := c.Query("name"); name != "" {
+		query = query.Where("name LIKE ?", "%"+name+"%")
+	}
+	if parentID := c.Query("parent_id"); parentID != "" {
+		if parentID == "0" {
+			query = query.Where("parent_id IS NULL")
+		} else {
+			query = query.Where("parent_id = ?", parentID)
+		}
+	}
+	var total int64
+	query.Count(&total)
+	page, pageSize, offset := getPagination(c)
+	query.Order("level asc, id asc").Offset(offset).Limit(pageSize).Find(&list)
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
+	})
+	writeLog(c, "部门管理", "查询", "查询部门列表")
+}
+
+func GetDepartment(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	var dept models.Department
+	if err := database.DB.Preload("Parent").First(&dept, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "部门不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": dept})
+	writeLog(c, "部门管理", "查询", "查询部门详情")
+}
+
 func CreateDepartment(c *gin.Context) {
 	var req DepartmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
