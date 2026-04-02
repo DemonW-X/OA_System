@@ -16,19 +16,18 @@ import (
 
 const menuCacheTTL = 30 * time.Minute
 
-func menuCacheKey(employeeID int) string {
-	if employeeID <= 0 {
+func menuCacheKey(positionID int) string {
+	if positionID <= 0 {
 		return "menu:tree:admin"
 	}
-	return fmt.Sprintf("menu:tree:employee:%d", employeeID)
+	return fmt.Sprintf("menu:tree:position:%d", positionID)
 }
 
-// getMenuTreeCache 从 Redis 读菜单树缓存，未命中返回 nil
-func getMenuTreeCache(employeeID int) []MenuTreeItem {
+func getMenuTreeCache(positionID int) []MenuTreeItem {
 	if database.RDB == nil {
 		return nil
 	}
-	val, err := database.RDB.Get(context.Background(), menuCacheKey(employeeID)).Result()
+	val, err := database.RDB.Get(context.Background(), menuCacheKey(positionID)).Result()
 	if err != nil {
 		return nil
 	}
@@ -39,8 +38,7 @@ func getMenuTreeCache(employeeID int) []MenuTreeItem {
 	return items
 }
 
-// setMenuTreeCache 将菜单树写入 Redis 缓存
-func setMenuTreeCache(employeeID int, items []MenuTreeItem) {
+func setMenuTreeCache(positionID int, items []MenuTreeItem) {
 	if database.RDB == nil {
 		return
 	}
@@ -48,18 +46,16 @@ func setMenuTreeCache(employeeID int, items []MenuTreeItem) {
 	if err != nil {
 		return
 	}
-	database.RDB.Set(context.Background(), menuCacheKey(employeeID), b, menuCacheTTL)
+	database.RDB.Set(context.Background(), menuCacheKey(positionID), b, menuCacheTTL)
 }
 
-// InvalidateMenuCache 删除指定员工的菜单缓存；employeeID<=0 时删除 admin 缓存
-func InvalidateMenuCache(employeeID int) {
+func InvalidateMenuCache(positionID int) {
 	if database.RDB == nil {
 		return
 	}
-	database.RDB.Del(context.Background(), menuCacheKey(employeeID))
+	database.RDB.Del(context.Background(), menuCacheKey(positionID))
 }
 
-// InvalidateAllMenuCache 删除所有员工菜单缓存（菜单结构变更时使用）
 func InvalidateAllMenuCache() {
 	if database.RDB == nil {
 		return
@@ -72,13 +68,12 @@ func InvalidateAllMenuCache() {
 	database.RDB.Del(ctx, keys...)
 }
 
-// getEmployeeAssignedMenuIDs 读取员工已分配菜单ID（公共方法）
-func getEmployeeAssignedMenuIDs(employeeID int) []int {
-	if employeeID <= 0 {
+func getPositionAssignedMenuIDs(positionID int) []int {
+	if positionID <= 0 {
 		return []int{}
 	}
-	var links []models.EmployeeMenuPermission
-	database.DB.Where("employee_id = ?", employeeID).Find(&links)
+	var links []models.PositionMenuPermission
+	database.DB.Where("position_id = ?", positionID).Find(&links)
 	if len(links) == 0 {
 		return []int{}
 	}
@@ -89,43 +84,73 @@ func getEmployeeAssignedMenuIDs(employeeID int) []int {
 	return ids
 }
 
-// resolveMenuFilterEmployeeID 解析当前请求应按哪个员工ID过滤菜单
-// 返回: employeeID, needFilter
-func resolveMenuFilterEmployeeID(c *gin.Context) (int, bool) {
+func resolveMenuFilterPositionID(c *gin.Context) (int, bool) {
+	if positionIDStr := strings.TrimSpace(c.Query("position_id")); positionIDStr != "" {
+		positionID, err := strconv.Atoi(positionIDStr)
+		if err != nil || positionID <= 0 {
+			return 0, true
+		}
+		return positionID, true
+	}
+
 	if employeeIDStr := strings.TrimSpace(c.Query("employee_id")); employeeIDStr != "" {
 		employeeID, err := strconv.Atoi(employeeIDStr)
 		if err != nil || employeeID <= 0 {
+			return 0, true
+		}
+		var emp models.Employee
+		err = database.DB.Select("id", "position_id").Where("id = ?", employeeID).First(&emp).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return 0, true
+			}
 			return 0, false
 		}
-		return employeeID, true
+		if emp.PositionID <= 0 {
+			return 0, true
+		}
+		return emp.PositionID, true
 	}
 
-	role := c.GetString("role")
-	if role == "admin" {
+	if c.GetString("role") == "admin" {
 		return 0, false
 	}
+
 	userID := c.GetInt("userID")
 	if userID <= 0 {
 		return 0, true
 	}
+
 	var emp models.Employee
-	err := database.DB.Select("id").Where("user_id = ?", userID).First(&emp).Error
+	err := database.DB.Select("id", "position_id").Where("user_id = ?", userID).First(&emp).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return 0, true
 		}
 		return 0, false
 	}
-	return emp.ID, true
+	if emp.PositionID <= 0 {
+		return 0, true
+	}
+	return emp.PositionID, true
 }
 
-// applyMenuPermissionScope 将员工菜单权限范围应用到查询（公共方法）
+// Compatibility wrapper: existing callers still use employee naming.
+func getEmployeeAssignedMenuIDs(employeeID int) []int {
+	return getPositionAssignedMenuIDs(employeeID)
+}
+
+// Compatibility wrapper: existing callers still use employee naming.
+func resolveMenuFilterEmployeeID(c *gin.Context) (int, bool) {
+	return resolveMenuFilterPositionID(c)
+}
+
 func applyMenuPermissionScope(c *gin.Context, query *gorm.DB) (*gorm.DB, bool) {
-	employeeID, needFilter := resolveMenuFilterEmployeeID(c)
+	positionID, needFilter := resolveMenuFilterPositionID(c)
 	if !needFilter {
 		return query, false
 	}
-	ids := getEmployeeAssignedMenuIDs(employeeID)
+	ids := getPositionAssignedMenuIDs(positionID)
 	if len(ids) == 0 {
 		return nil, true
 	}

@@ -146,7 +146,6 @@ const routeComponentMap = {
   '/onboarding':                () => import('./views/Onboarding.vue'),
   '/workflow':                  () => import('./views/Workflow.vue'),
   '/menu':                      () => import('./views/Menu.vue'),
-  '/employee-menu-permission':  () => import('./views/EmployeeMenuPermission.vue'),
   '/schedule':                  () => import('./views/Schedule.vue'),
   '/role':                      () => import('./views/Role.vue'),
 }

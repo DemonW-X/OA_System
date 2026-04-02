@@ -17,6 +17,10 @@ type PositionRequest struct {
 	Remark       string `json:"remark"`
 }
 
+type PositionMenuPermissionRequest struct {
+	MenuIDs []int `json:"menu_ids"`
+}
+
 func GetPositions(c *gin.Context) {
 	var list []models.Position
 	query := database.DB.Model(&models.Position{})
@@ -274,7 +278,7 @@ func SetPositionMenuPermissions(c *gin.Context) {
 		return
 	}
 
-	var req EmployeeMenuPermissionRequest
+	var req PositionMenuPermissionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
