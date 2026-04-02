@@ -40,7 +40,7 @@ func GetPositions(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 	page, pageSize, offset := getPagination(c)
-	query.Order("sort_order asc, id asc").Offset(offset).Limit(pageSize).Find(&list)
+	query.Order("id asc").Offset(offset).Limit(pageSize).Find(&list)
 
 	// 回填前端兼容字段：department_id / department
 	for i := range list {

@@ -42,7 +42,6 @@
         </div>
         <el-table :data="positionList" stripe size="small" v-loading="loadingPositions">
           <el-table-column prop="name" label="职位名称" />
-          <el-table-column prop="sort_order" label="排序" width="90" />
           <el-table-column prop="remark" label="备注" />
           <el-table-column label="操作" width="100">
             <template #default="{ row }">
@@ -82,7 +81,7 @@
             <div style="font-weight:600;margin-bottom:12px">选择职位（可多选）</div>
             <el-checkbox-group v-model="addSelectedPositions">
               <div v-for="p in allPositions" :key="p.id" style="margin-bottom:8px">
-                <el-checkbox :label="p.id">{{ p.name }}（排序: {{ p.sort_order || 0 }}）</el-checkbox>
+                <el-checkbox :label="p.id">{{ p.name }}</el-checkbox>
               </div>
             </el-checkbox-group>
           </div>
@@ -215,7 +214,7 @@ const handleDeptClick = async (dept) => {
     positionList.value = rels.map(r => ({
       ...r.position,
       relation_id: r.id
-    })).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    })).sort((a, b) => a.id - b.id)
   } finally {
     loadingPositions.value = false
   }

@@ -17,7 +17,6 @@
     <el-table :data="posList" stripe>
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="职位名称" />
-      <el-table-column prop="sort_order" label="排序" width="90" />
       <el-table-column prop="remark" label="备注" />
       <el-table-column label="操作" width="160">
         <template #default="{ row }">
@@ -43,9 +42,6 @@
       <el-form-item label="职位名称">
         <el-input v-model="posForm.name" />
       </el-form-item>
-      <el-form-item label="排序">
-        <el-input-number v-model="posForm.sort_order" :min="0" style="width:100%" />
-      </el-form-item>
       <el-form-item label="备注">
         <el-input v-model="posForm.remark" type="textarea" />
       </el-form-item>
@@ -65,7 +61,7 @@ import { getPositions, createPosition, updatePosition, deletePosition } from '..
 const posList = ref([])
 const posTotal = ref(0)
 const posDialogVisible = ref(false)
-const posForm = ref({ name: '', sort_order: 0, remark: '' })
+const posForm = ref({ name: '', remark: '' })
 const posQuery = ref({ name: '', page: 1, page_size: 10 })
 
 const loadPositions = async () => {
@@ -78,7 +74,7 @@ const handlePosSearch = () => { posQuery.value.page = 1; loadPositions() }
 const handlePosReset = () => { posQuery.value = { name: '', page: 1, page_size: 10 }; loadPositions() }
 
 const openPosDialog = (row = null) => {
-  posForm.value = row ? { id: row.id, name: row.name, sort_order: row.sort_order || 0, remark: row.remark } : { name: '', sort_order: 0, remark: '' }
+  posForm.value = row ? { id: row.id, name: row.name, remark: row.remark } : { name: '', remark: '' }
   posDialogVisible.value = true
 }
 
