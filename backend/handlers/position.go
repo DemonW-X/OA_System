@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"oa-system/database"
 	"oa-system/models"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,7 @@ type PositionRequest struct {
 func GetPositions(c *gin.Context) {
 	var list []models.Position
 	query := database.DB.Model(&models.Position{})
+
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	if keyword == "" {
 		keyword = strings.TrimSpace(c.Query("name"))
@@ -28,7 +30,6 @@ func GetPositions(c *gin.Context) {
 		query = query.Where("name LIKE ? OR remark LIKE ?", like, like)
 	}
 
-	// 按部门过滤：通过关系表筛选职位
 	if deptID := c.Query("department_id"); deptID != "" {
 		query = query.Where("id IN (?)",
 			database.DB.Model(&models.DepartmentPosition{}).
@@ -42,7 +43,6 @@ func GetPositions(c *gin.Context) {
 	page, pageSize, offset := getPagination(c)
 	query.Order("id asc").Offset(offset).Limit(pageSize).Find(&list)
 
-	// 回填前端兼容字段：department_id / department
 	for i := range list {
 		var rel models.DepartmentPosition
 		err := database.DB.Preload("Department").
@@ -67,6 +67,7 @@ func GetPosition(c *gin.Context) {
 	if !ok {
 		return
 	}
+
 	var pos models.Position
 	if err := database.DB.First(&pos, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "职位不存在"})
@@ -94,7 +95,6 @@ func CreatePosition(c *gin.Context) {
 		return
 	}
 
-	// 若传了部门，则做“部门内同名唯一”校验
 	if req.DepartmentID > 0 {
 		var cnt int64
 		database.DB.Model(&models.Position{}).
@@ -139,11 +139,13 @@ func UpdatePosition(c *gin.Context) {
 	if !ok {
 		return
 	}
+
 	var pos models.Position
 	if err := database.DB.First(&pos, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "职位不存在"})
 		return
 	}
+
 	var req PositionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
@@ -172,7 +174,6 @@ func UpdatePosition(c *gin.Context) {
 		return
 	}
 
-	// 维护部门-职位关系（这里按“一个职位当前只挂一个部门”处理；未来可扩展多部门）
 	if req.DepartmentID > 0 {
 		if err := tx.Where("position_id = ?", pos.ID).Delete(&models.DepartmentPosition{}).Error; err != nil {
 			tx.Rollback()
@@ -197,6 +198,7 @@ func DeletePosition(c *gin.Context) {
 	if !ok {
 		return
 	}
+
 	var pos models.Position
 	if err := database.DB.First(&pos, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "职位不存在"})
@@ -218,4 +220,119 @@ func DeletePosition(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
 	writeLog(c, "职位管理", "删除", "删除职位："+pos.Name)
+}
+
+func GetPositionMenuPermissions(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "无权限"})
+		return
+	}
+
+	positionID, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var pos models.Position
+	if err := database.DB.Select("id", "name").First(&pos, positionID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "职位不存在"})
+		return
+	}
+
+	var menus []models.Menu
+	database.DB.Order("sort_code asc, id asc").Find(&menus)
+
+	var links []models.PositionMenuPermission
+	database.DB.Where("position_id = ?", positionID).Find(&links)
+	ids := make([]int, 0, len(links))
+	for _, l := range links {
+		ids = append(ids, l.MenuID)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{
+		"position_id":      positionID,
+		"position_name":    pos.Name,
+		"menu_tree":        buildMenuTree(menus),
+		"checked_menu_ids": ids,
+	}})
+}
+
+func SetPositionMenuPermissions(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "无权限"})
+		return
+	}
+
+	positionID, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var pos models.Position
+	if err := database.DB.Select("id", "name").First(&pos, positionID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "职位不存在"})
+		return
+	}
+
+	var req EmployeeMenuPermissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
+		return
+	}
+
+	var menus []models.Menu
+	database.DB.Select("id", "parent_id").Find(&menus)
+	parentMap := map[int]int{}
+	valid := map[int]bool{}
+	for _, m := range menus {
+		parentMap[m.ID] = m.ParentID
+		valid[m.ID] = true
+	}
+
+	selected := map[int]bool{}
+	for _, id := range req.MenuIDs {
+		if id <= 0 || !valid[id] {
+			continue
+		}
+		selected[id] = true
+		pid := parentMap[id]
+		for pid > 0 {
+			if !valid[pid] {
+				break
+			}
+			if selected[pid] {
+				break
+			}
+			selected[pid] = true
+			pid = parentMap[pid]
+		}
+	}
+
+	ids := make([]int, 0, len(selected))
+	for id := range selected {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+
+	tx := database.DB.Begin()
+	if err := tx.Where("position_id = ?", positionID).Delete(&models.PositionMenuPermission{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "保存失败"})
+		return
+	}
+	if len(ids) > 0 {
+		links := make([]models.PositionMenuPermission, 0, len(ids))
+		for _, id := range ids {
+			links = append(links, models.PositionMenuPermission{PositionID: positionID, MenuID: id})
+		}
+		if err := tx.Create(&links).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "保存失败: " + err.Error()})
+			return
+		}
+	}
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"position_id": positionID, "checked_menu_ids": ids}})
+	writeLog(c, "职位权限", "分配", "设置职位菜单权限："+pos.Name)
 }
