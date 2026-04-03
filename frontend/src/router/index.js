@@ -4,7 +4,6 @@ const routes = [
   { path: '/login', component: () => import('../views/Login.vue') },
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', component: () => import('../views/Dashboard.vue'), meta: { requiresAuth: true } },
-  { path: '/department', component: () => import('../views/Department.vue'), meta: { requiresAuth: true } },
   { path: '/employee', component: () => import('../views/Employee.vue'), meta: { requiresAuth: true } },
   { path: '/notice', component: () => import('../views/Notice.vue'), meta: { requiresAuth: true } },
   { path: '/log', component: () => import('../views/OperationLog.vue'), meta: { requiresAuth: true } },

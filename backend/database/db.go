@@ -29,5 +29,19 @@ func InitDB() {
 	}
 
 	DB = db
+	cleanupDeprecatedSchema(db)
 	log.Println("数据库连接成功")
+}
+
+func cleanupDeprecatedSchema(db *gorm.DB) {
+	if !db.Migrator().HasTable("positions") {
+		return
+	}
+	if db.Migrator().HasColumn("positions", "sort_order") {
+		if err := db.Migrator().DropColumn("positions", "sort_order"); err != nil {
+			log.Printf("删除字段 positions.sort_order 失败: %v", err)
+		} else {
+			log.Println("已删除字段 positions.sort_order")
+		}
+	}
 }

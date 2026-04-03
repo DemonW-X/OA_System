@@ -135,7 +135,6 @@ const menus = ref([])
 // 路由path -> 组件 映射
 const routeComponentMap = {
   '/dashboard':                 () => import('./views/Dashboard.vue'),
-  '/department':                () => import('./views/Department.vue'),
   '/employee':                  () => import('./views/Employee.vue'),
   '/notice':                    () => import('./views/Notice.vue'),
   '/log':                       () => import('./views/OperationLog.vue'),

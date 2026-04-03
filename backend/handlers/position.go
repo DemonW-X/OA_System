@@ -12,7 +12,6 @@ import (
 
 type PositionRequest struct {
 	Name         string `json:"name" binding:"required"`
-	SortOrder    int    `json:"sort_order"`
 	DepartmentID int    `json:"department_id"`
 	Remark       string `json:"remark"`
 }
@@ -111,7 +110,7 @@ func CreatePosition(c *gin.Context) {
 		}
 	}
 
-	pos := models.Position{Name: req.Name, SortOrder: req.SortOrder, Remark: req.Remark}
+	pos := models.Position{Name: req.Name, Remark: req.Remark}
 	tx := database.DB.Begin()
 	if err := tx.Create(&pos).Error; err != nil {
 		tx.Rollback()
@@ -170,7 +169,6 @@ func UpdatePosition(c *gin.Context) {
 
 	tx := database.DB.Begin()
 	pos.Name = req.Name
-	pos.SortOrder = req.SortOrder
 	pos.Remark = req.Remark
 	if err := tx.Save(&pos).Error; err != nil {
 		tx.Rollback()
@@ -244,7 +242,7 @@ func GetPositionMenuPermissions(c *gin.Context) {
 	}
 
 	var menus []models.Menu
-	database.DB.Order("sort_code asc, id asc").Find(&menus)
+	database.DB.Order("id asc").Find(&menus)
 
 	var links []models.PositionMenuPermission
 	database.DB.Where("position_id = ?", positionID).Find(&links)

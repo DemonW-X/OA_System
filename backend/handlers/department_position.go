@@ -1,12 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"oa-system/database"
 	"oa-system/models"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type DepartmentPositionRequest struct {
@@ -30,7 +31,7 @@ func GetDepartmentPositions(c *gin.Context) {
 	var total int64
 	query.Count(&total)
 	page, pageSize, offset := getPagination(c)
-	query.Order("id desc").Offset(offset).Limit(pageSize).Find(&list)
+	query.Order("id asc").Offset(offset).Limit(pageSize).Find(&list)
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
@@ -57,17 +58,45 @@ func CreateDepartmentPosition(c *gin.Context) {
 		return
 	}
 
-	var exists int64
-	database.DB.Model(&models.DepartmentPosition{}).
+	var rel models.DepartmentPosition
+	err := database.DB.Unscoped().
 		Where("department_id = ? AND position_id = ?", req.DepartmentID, req.PositionID).
-		Count(&exists)
-	if exists > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "该部门-职位关系已存在"})
+		First(&rel).Error
+	if err == nil {
+		if rel.DeletedAt.Valid {
+			if err := database.DB.Unscoped().
+				Model(&models.DepartmentPosition{}).
+				Where("id = ?", rel.ID).
+				Update("deleted_at", nil).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "恢复关系失败: " + err.Error()})
+				return
+			}
+			database.DB.Preload("Department").Preload("Position").First(&rel, rel.ID)
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": rel, "msg": "关系已恢复"})
+			writeLog(c, "角色管理", "新增", "恢复部门-职位关系")
+			return
+		}
+
+		database.DB.Preload("Department").Preload("Position").First(&rel, rel.ID)
+		c.JSON(http.StatusOK, gin.H{"code": 0, "data": rel, "msg": "该部门-职位关系已存在"})
+		return
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "查询关系失败: " + err.Error()})
 		return
 	}
 
-	rel := models.DepartmentPosition{DepartmentID: req.DepartmentID, PositionID: req.PositionID}
+	rel = models.DepartmentPosition{DepartmentID: req.DepartmentID, PositionID: req.PositionID}
 	if err := database.DB.Create(&rel).Error; err != nil {
+		// 并发场景下可能出现重复插入，兜底返回已存在关系（幂等）
+		var existing models.DepartmentPosition
+		if findErr := database.DB.
+			Where("department_id = ? AND position_id = ?", req.DepartmentID, req.PositionID).
+			First(&existing).Error; findErr == nil {
+			database.DB.Preload("Department").Preload("Position").First(&existing, existing.ID)
+			c.JSON(http.StatusOK, gin.H{"code": 0, "data": existing, "msg": "该部门-职位关系已存在"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建失败: " + err.Error()})
 		return
 	}
@@ -86,86 +115,10 @@ func DeleteDepartmentPosition(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "关系不存在"})
 		return
 	}
-	if err := database.DB.Delete(&rel).Error; err != nil {
+	if err := database.DB.Unscoped().Delete(&rel).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "删除失败"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
 	writeLog(c, "角色管理", "删除", "删除部门-职位关系")
-}
-
-func GetDepartmentPositionTree(c *gin.Context) {
-	var depts []models.Department
-	var relations []models.DepartmentPosition
-	var positions []models.Position
-
-	database.DB.Order("level asc, id asc").Find(&depts)
-	database.DB.Preload("Position").Order("id asc").Find(&relations)
-	database.DB.Order("sort_order asc, id asc").Find(&positions)
-
-	type treeNode struct {
-		ID         string      `json:"id"`
-		Type       string      `json:"type"`
-		Name       string      `json:"name"`
-		RefID      int         `json:"ref_id"`
-		RelationID int         `json:"relation_id,omitempty"`
-		Children   []*treeNode `json:"children,omitempty"`
-	}
-
-	deptNodeMap := map[int]*treeNode{}
-	for _, d := range depts {
-		deptNodeMap[d.ID] = &treeNode{
-			ID:       "dept-" + strconv.Itoa(d.ID),
-			Type:     "department",
-			Name:     d.Name,
-			RefID:    d.ID,
-			Children: []*treeNode{},
-		}
-	}
-
-	roots := []*treeNode{}
-	for _, d := range depts {
-		node := deptNodeMap[d.ID]
-		if d.ParentID != nil {
-			if p, ok := deptNodeMap[*d.ParentID]; ok {
-				p.Children = append(p.Children, node)
-				continue
-			}
-		}
-		roots = append(roots, node)
-	}
-
-	usedPos := map[int]bool{}
-	for _, r := range relations {
-		if dn, ok := deptNodeMap[r.DepartmentID]; ok {
-			dn.Children = append(dn.Children, &treeNode{
-				ID:         "rel-" + strconv.Itoa(r.ID),
-				Type:       "position",
-				Name:       r.Position.Name,
-				RefID:      r.PositionID,
-				RelationID: r.ID,
-			})
-			usedPos[r.PositionID] = true
-		}
-	}
-
-	if len(positions) > 0 {
-		unbound := &treeNode{ID: "unbound", Type: "group", Name: "未关联职位", RefID: 0, Children: []*treeNode{}}
-		for _, p := range positions {
-			if !usedPos[p.ID] {
-				unbound.Children = append(unbound.Children, &treeNode{
-					ID:    "pos-" + strconv.Itoa(p.ID),
-					Type:  "position-unbound",
-					Name:  p.Name,
-					RefID: p.ID,
-				})
-			}
-		}
-		if len(unbound.Children) > 0 {
-			roots = append(roots, unbound)
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{"code": 0, "data": roots})
-	writeLog(c, "角色管理", "查询", "查询部门-职位关系树")
 }
