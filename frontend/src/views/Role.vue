@@ -43,20 +43,80 @@
             </div>
 
             <div class="role-toolbar-actions">
-              <el-button type="primary" plain @click="openBindDialog">关联已有角色</el-button>
-              <el-button type="primary" @click="openPositionDialog()">新建角色并关联</el-button>
+              <el-button type="primary" size="small" plain @click="openBindDialog">关联已有角色</el-button>
+              <el-button type="primary" size="small" @click="openPositionDialog()">新建角色并关联</el-button>
             </div>
           </div>
 
-          <el-table :data="positionList" stripe size="small" v-loading="loadingPositions">
-            <el-table-column prop="name" label="角色名称" min-width="160" />
-            <el-table-column prop="remark" label="备注" min-width="180" />
-            <el-table-column label="操作" width="280" fixed="right">
+          <el-table
+            :data="positionList"
+            stripe
+            size="small"
+            row-key="id"
+            v-loading="loadingPositions"
+            highlight-current-row
+            :row-class-name="getRoleRowClassName"
+            @row-click="handleRoleRowClick"
+          >
+            <el-table-column prop="name" label="角色名称" min-width="150" />
+            <el-table-column prop="remark" label="备注" min-width="140" />
+            <el-table-column label="操作" width="250" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="openPermDrawer(row)">权限设置</el-button>
                 <el-button link size="small" @click="openPositionDialog(row)">编辑</el-button>
-                <el-button link type="warning" size="small" @click="handleRemoveRelation(row)">移除关系</el-button>
-                <el-button link type="danger" size="small" @click="handleDeletePosition(row)">删除角色</el-button>
+                <el-button link type="warning" size="small" @click="handleRemoveRelation(row)">移除</el-button>
+                <el-button link type="danger" size="small" @click="handleDeletePosition(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+      </div>
+
+      <div class="employee-panel">
+        <div v-if="!selectedDept" class="empty-placeholder">
+          请先在左侧选择部门
+        </div>
+
+        <div v-else-if="!selectedRole" class="empty-placeholder">
+          请点击中间角色，查看并配置该角色的人员关联
+        </div>
+
+        <template v-else>
+          <div class="employee-toolbar">
+            <div class="employee-toolbar-title">
+              <span>角色：{{ selectedRole.name }}</span>
+              <el-tag type="success" size="small">已关联 {{ roleSelectedEmployeeIDs.length }} 人</el-tag>
+            </div>
+            <div class="employee-toolbar-actions">
+              <el-button size="small" @click="toggleRoleEmployeeSelections(true)">全选</el-button>
+              <el-button size="small" @click="toggleRoleEmployeeSelections(false)">清空</el-button>
+              <el-button type="primary" size="small" :loading="savingRoleEmployees" @click="handleSaveRoleEmployees">保存人员关联</el-button>
+            </div>
+          </div>
+
+          <el-table
+            ref="roleEmployeeTableRef"
+            :data="roleEmployeeList"
+            stripe
+            size="small"
+            row-key="id"
+            height="calc(100% - 70px)"
+            v-loading="loadingRoleEmployees"
+            @selection-change="handleRoleEmployeeSelectionChange"
+          >
+            <el-table-column type="selection" width="48" />
+            <el-table-column prop="name" label="员工姓名" min-width="120" />
+            <el-table-column prop="phone" label="手机号" min-width="130" />
+            <el-table-column label="当前角色" min-width="140">
+              <template #default="{ row }">
+                <span>{{ row.position_info?.name || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.status === 1 ? 'success' : 'info'">
+                  {{ row.status === 1 ? '在职' : '离职' }}
+                </el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -163,10 +223,12 @@ import {
   createPosition,
   updatePosition,
   deletePosition,
+  setPositionEmployees,
   getPositionMenuPermissions,
   setPositionMenuPermissions
 } from '../api/position'
 import { createDepartmentPosition, deleteDepartmentPosition, getDepartmentPositions } from '../api/department_position'
+import { getEmployees } from '../api/employee'
 
 const deptTreeRef = ref()
 const deptTree = ref([])
@@ -175,6 +237,13 @@ const selectedDept = ref(null)
 const positionList = ref([])
 const allPositions = ref([])
 const loadingPositions = ref(false)
+const selectedRole = ref(null)
+
+const roleEmployeeList = ref([])
+const loadingRoleEmployees = ref(false)
+const savingRoleEmployees = ref(false)
+const roleSelectedEmployeeIDs = ref([])
+const roleEmployeeTableRef = ref()
 
 const bindDialogVisible = ref(false)
 const bindSelectedPositionIDs = ref([])
@@ -265,6 +334,51 @@ const getFirstDept = (nodes) => {
   return nodes[0]
 }
 
+const setRoleEmployeeSelectionByIDs = async (ids = []) => {
+  await nextTick()
+  const table = roleEmployeeTableRef.value
+  if (!table) return
+  table.clearSelection()
+  const selectedSet = new Set(ids)
+  for (const row of roleEmployeeList.value) {
+    if (selectedSet.has(row.id)) {
+      table.toggleRowSelection(row, true)
+    }
+  }
+}
+
+const clearSelectedRoleEmployees = () => {
+  selectedRole.value = null
+  roleEmployeeList.value = []
+  roleSelectedEmployeeIDs.value = []
+}
+
+const loadRoleEmployees = async (role) => {
+  if (!role?.id || !selectedDept.value?.id) {
+    clearSelectedRoleEmployees()
+    return
+  }
+
+  selectedRole.value = role
+  loadingRoleEmployees.value = true
+  try {
+    const res = await getEmployees({
+      department_id: selectedDept.value.id,
+      page: 1,
+      page_size: 1000
+    })
+    const list = res.data?.data?.list || []
+    roleEmployeeList.value = list.sort((a, b) => (a.id || 0) - (b.id || 0))
+    const selectedIDs = roleEmployeeList.value
+      .filter((item) => item.position_id === role.id)
+      .map((item) => item.id)
+    roleSelectedEmployeeIDs.value = selectedIDs
+    await setRoleEmployeeSelectionByIDs(selectedIDs)
+  } finally {
+    loadingRoleEmployees.value = false
+  }
+}
+
 const loadDeptTree = async () => {
   const previousID = selectedDept.value?.id || null
   const res = await getDepartments({ page: 1, page_size: 1000 })
@@ -299,8 +413,10 @@ const loadAllPositions = async () => {
 const loadDeptPositions = async (dept) => {
   if (!dept?.id) {
     positionList.value = []
+    clearSelectedRoleEmployees()
     return
   }
+  const previousRoleID = selectedRole.value?.id || null
   selectedDept.value = dept
   loadingPositions.value = true
   try {
@@ -315,10 +431,60 @@ const loadDeptPositions = async (dept) => {
   } finally {
     loadingPositions.value = false
   }
+
+  if (!positionList.value.length) {
+    clearSelectedRoleEmployees()
+    return
+  }
+
+  const nextRole = previousRoleID
+    ? positionList.value.find((item) => item.id === previousRoleID) || positionList.value[0]
+    : positionList.value[0]
+  await loadRoleEmployees(nextRole)
 }
 
 const handleDeptClick = async (dept) => {
   await loadDeptPositions(dept)
+}
+
+const getRoleRowClassName = ({ row }) => {
+  if (selectedRole.value?.id === row?.id) return 'role-row-active'
+  return ''
+}
+
+const handleRoleRowClick = async (row) => {
+  await loadRoleEmployees(row)
+}
+
+const handleRoleEmployeeSelectionChange = (rows = []) => {
+  roleSelectedEmployeeIDs.value = rows.map((item) => item.id)
+}
+
+const toggleRoleEmployeeSelections = async (checked) => {
+  if (!roleEmployeeList.value.length) return
+  const ids = checked ? roleEmployeeList.value.map((item) => item.id) : []
+  roleSelectedEmployeeIDs.value = ids
+  await setRoleEmployeeSelectionByIDs(ids)
+}
+
+const handleSaveRoleEmployees = async () => {
+  const roleID = selectedRole.value?.id
+  const departmentID = selectedDept.value?.id
+  if (!roleID || !departmentID) return
+
+  savingRoleEmployees.value = true
+  try {
+    await setPositionEmployees(roleID, {
+      department_id: departmentID,
+      employee_ids: roleSelectedEmployeeIDs.value
+    })
+    ElMessage.success('人员关联保存成功')
+    await loadRoleEmployees(selectedRole.value)
+  } catch (error) {
+    ElMessage.error(extractErrorMessage(error, '人员关联保存失败'))
+  } finally {
+    savingRoleEmployees.value = false
+  }
 }
 
 const openDeptDialog = (dept = null, parentID = null) => {
@@ -377,6 +543,7 @@ const handleDeptDelete = async (id) => {
     if (selectedDept.value?.id === id) {
       selectedDept.value = null
       positionList.value = []
+      clearSelectedRoleEmployees()
     }
 
     await loadDeptTree()
@@ -667,12 +834,20 @@ onMounted(async () => {
 }
 
 .role-panel {
+  width: 520px;
+  overflow: auto;
+  padding: 12px;
+  border-right: 1px solid #ebeef5;
+}
+
+.employee-panel {
   flex: 1;
   overflow: auto;
   padding: 12px;
 }
 
-.role-toolbar {
+.role-toolbar,
+.employee-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -680,14 +855,16 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
-.role-toolbar-title {
+.role-toolbar-title,
+.employee-toolbar-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 600;
 }
 
-.role-toolbar-actions {
+.role-toolbar-actions,
+.employee-toolbar-actions {
   display: inline-flex;
   gap: 8px;
 }
@@ -713,6 +890,10 @@ onMounted(async () => {
 
 .bind-item:last-child {
   border-bottom: none;
+}
+
+:deep(.role-row-active > td) {
+  background: #ecf5ff !important;
 }
 
 .perm-drawer-body {

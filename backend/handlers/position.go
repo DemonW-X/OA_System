@@ -20,6 +20,11 @@ type PositionMenuPermissionRequest struct {
 	MenuIDs []int `json:"menu_ids"`
 }
 
+type PositionEmployeeRelationRequest struct {
+	DepartmentID int   `json:"department_id"`
+	EmployeeIDs  []int `json:"employee_ids"`
+}
+
 func GetPositions(c *gin.Context) {
 	var list []models.Position
 	query := database.DB.Model(&models.Position{})
@@ -222,6 +227,108 @@ func DeletePosition(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
 	writeLog(c, "职位管理", "删除", "删除职位："+pos.Name)
+}
+
+func SetPositionEmployees(c *gin.Context) {
+	positionID, ok := parseID(c)
+	if !ok {
+		return
+	}
+
+	var pos models.Position
+	if err := database.DB.Select("id", "name").First(&pos, positionID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "职位不存在"})
+		return
+	}
+
+	var req PositionEmployeeRelationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
+		return
+	}
+
+	if req.DepartmentID > 0 {
+		var dept models.Department
+		if err := database.DB.Select("id").First(&dept, req.DepartmentID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "部门不存在"})
+			return
+		}
+	}
+
+	uniqSet := make(map[int]struct{})
+	uniqEmployeeIDs := make([]int, 0, len(req.EmployeeIDs))
+	for _, id := range req.EmployeeIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, exists := uniqSet[id]; exists {
+			continue
+		}
+		uniqSet[id] = struct{}{}
+		uniqEmployeeIDs = append(uniqEmployeeIDs, id)
+	}
+
+	if len(uniqEmployeeIDs) > 0 {
+		var count int64
+		checkQuery := database.DB.Model(&models.Employee{}).Where("id IN ?", uniqEmployeeIDs)
+		if req.DepartmentID > 0 {
+			checkQuery = checkQuery.Where("department_id = ?", req.DepartmentID)
+		}
+		if err := checkQuery.Count(&count).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "校验员工失败: " + err.Error()})
+			return
+		}
+		if int(count) != len(uniqEmployeeIDs) {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "包含无效员工，或员工不在当前部门"})
+			return
+		}
+	}
+
+	tx := database.DB.Begin()
+
+	clearQuery := tx.Model(&models.Employee{}).Where("position_id = ?", positionID)
+	if req.DepartmentID > 0 {
+		clearQuery = clearQuery.Where("department_id = ?", req.DepartmentID)
+	}
+	if err := clearQuery.Update("position_id", 0).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "清除原人员关联失败: " + err.Error()})
+		return
+	}
+
+	if len(uniqEmployeeIDs) > 0 {
+		assignQuery := tx.Model(&models.Employee{}).Where("id IN ?", uniqEmployeeIDs)
+		if req.DepartmentID > 0 {
+			assignQuery = assignQuery.Where("department_id = ?", req.DepartmentID)
+		}
+		if err := assignQuery.Update("position_id", positionID).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "设置人员关联失败: " + err.Error()})
+			return
+		}
+	}
+
+	tx.Commit()
+
+	var linked []models.Employee
+	listQuery := database.DB.Model(&models.Employee{}).Preload("Department").Preload("PositionInfo").Where("position_id = ?", positionID)
+	if req.DepartmentID > 0 {
+		listQuery = listQuery.Where("department_id = ?", req.DepartmentID)
+	}
+	listQuery.Order("id asc").Find(&linked)
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"data": gin.H{
+			"position_id":   positionID,
+			"position_name": pos.Name,
+			"department_id": req.DepartmentID,
+			"employee_ids":  uniqEmployeeIDs,
+			"list":          linked,
+			"total":         len(linked),
+		},
+	})
+	writeLog(c, "角色管理", "人员关联", "设置角色人员关联："+pos.Name)
 }
 
 func GetPositionMenuPermissions(c *gin.Context) {

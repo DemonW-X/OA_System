@@ -12,6 +12,7 @@ func positionRoutes(rg *gin.RouterGroup) {
 	rg.POST("/positions", handlers.CreatePosition)
 	rg.PUT("/positions/:id", handlers.UpdatePosition)
 	rg.DELETE("/positions/:id", handlers.DeletePosition)
+	rg.PUT("/positions/:id/employees", handlers.SetPositionEmployees)
 	rg.GET("/positions/:id/menu-permissions", handlers.GetPositionMenuPermissions)
 	rg.PUT("/positions/:id/menu-permissions", handlers.SetPositionMenuPermissions)
 }

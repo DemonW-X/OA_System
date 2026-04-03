@@ -48,13 +48,16 @@ func GetEmployees(c *gin.Context) {
 	if deptID := c.Query("department_id"); deptID != "" {
 		query = query.Where("department_id = ?", deptID)
 	}
+	if posID := c.Query("position_id"); posID != "" {
+		query = query.Where("position_id = ?", posID)
+	}
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
 	var total int64
 	query.Count(&total)
 	page, pageSize, offset := getPagination(c)
-	query.Offset(offset).Limit(pageSize).Find(&list)
+	query.Order("id asc").Offset(offset).Limit(pageSize).Find(&list)
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
