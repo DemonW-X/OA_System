@@ -8,7 +8,7 @@ import (
 )
 
 func writeLog(c *gin.Context, module, action, remark string) {
-	log := models.OperationLog{
+	entry := models.OperationLog{
 		UserID:     c.GetInt("userID"),
 		Username:   c.GetString("username"),
 		Module:     module,
@@ -19,5 +19,9 @@ func writeLog(c *gin.Context, module, action, remark string) {
 		IP:         c.ClientIP(),
 		Remark:     remark,
 	}
-	database.DB.Create(&log)
+
+	if enqueueOperationLog(entry) {
+		return
+	}
+	database.DB.Create(&entry)
 }

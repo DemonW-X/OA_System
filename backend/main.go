@@ -15,6 +15,7 @@ func main() {
 
 	handlers.InitAdmin()
 	handlers.InitBizTypes()
+	handlers.InitOperationLogAsync()
 
 	r := routes.SetupRouter()
 	log.Printf("服务启动在 :%s", config.AppConfig.ServerPort)
