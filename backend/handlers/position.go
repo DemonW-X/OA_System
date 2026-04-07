@@ -247,12 +247,15 @@ func SetPositionEmployees(c *gin.Context) {
 		return
 	}
 
-	if req.DepartmentID > 0 {
-		var dept models.Department
-		if err := database.DB.Select("id").First(&dept, req.DepartmentID).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "部门不存在"})
-			return
-		}
+	if req.DepartmentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "部门不能为空"})
+		return
+	}
+
+	var dept models.Department
+	if err := database.DB.Select("id").First(&dept, req.DepartmentID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "部门不存在"})
+		return
 	}
 
 	uniqSet := make(map[int]struct{})
@@ -269,27 +272,27 @@ func SetPositionEmployees(c *gin.Context) {
 	}
 
 	if len(uniqEmployeeIDs) > 0 {
-		var count int64
-		checkQuery := database.DB.Model(&models.Employee{}).Where("id IN ?", uniqEmployeeIDs)
-		if req.DepartmentID > 0 {
-			checkQuery = checkQuery.Where("department_id = ?", req.DepartmentID)
-		}
-		if err := checkQuery.Count(&count).Error; err != nil {
+		var existingIDs []int
+		if err := database.DB.Model(&models.Employee{}).Where("id IN ?", uniqEmployeeIDs).Pluck("id", &existingIDs).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "校验员工失败: " + err.Error()})
 			return
 		}
-		if int(count) != len(uniqEmployeeIDs) {
-			c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "包含无效员工，或员工不在当前部门"})
-			return
+		validSet := make(map[int]struct{}, len(existingIDs))
+		for _, id := range existingIDs {
+			validSet[id] = struct{}{}
 		}
+		filtered := make([]int, 0, len(existingIDs))
+		for _, id := range uniqEmployeeIDs {
+			if _, ok := validSet[id]; ok {
+				filtered = append(filtered, id)
+			}
+		}
+		uniqEmployeeIDs = filtered
 	}
 
 	tx := database.DB.Begin()
 
-	clearQuery := tx.Model(&models.Employee{}).Where("position_id = ?", positionID)
-	if req.DepartmentID > 0 {
-		clearQuery = clearQuery.Where("department_id = ?", req.DepartmentID)
-	}
+	clearQuery := tx.Model(&models.Employee{}).Where("position_id = ? AND department_id = ?", positionID, req.DepartmentID)
 	if err := clearQuery.Update("position_id", 0).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "清除原人员关联失败: " + err.Error()})
@@ -298,10 +301,10 @@ func SetPositionEmployees(c *gin.Context) {
 
 	if len(uniqEmployeeIDs) > 0 {
 		assignQuery := tx.Model(&models.Employee{}).Where("id IN ?", uniqEmployeeIDs)
-		if req.DepartmentID > 0 {
-			assignQuery = assignQuery.Where("department_id = ?", req.DepartmentID)
-		}
-		if err := assignQuery.Update("position_id", positionID).Error; err != nil {
+		if err := assignQuery.Updates(map[string]interface{}{
+			"department_id": req.DepartmentID,
+			"position_id":   positionID,
+		}).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "设置人员关联失败: " + err.Error()})
 			return
@@ -310,13 +313,6 @@ func SetPositionEmployees(c *gin.Context) {
 
 	tx.Commit()
 
-	var linked []models.Employee
-	listQuery := database.DB.Model(&models.Employee{}).Preload("Department").Preload("PositionInfo").Where("position_id = ?", positionID)
-	if req.DepartmentID > 0 {
-		listQuery = listQuery.Where("department_id = ?", req.DepartmentID)
-	}
-	listQuery.Order("id asc").Find(&linked)
-
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{
@@ -324,8 +320,7 @@ func SetPositionEmployees(c *gin.Context) {
 			"position_name": pos.Name,
 			"department_id": req.DepartmentID,
 			"employee_ids":  uniqEmployeeIDs,
-			"list":          linked,
-			"total":         len(linked),
+			"total":         len(uniqEmployeeIDs),
 		},
 	})
 	writeLog(c, "角色管理", "人员关联", "设置角色人员关联："+pos.Name)

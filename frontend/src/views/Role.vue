@@ -84,34 +84,25 @@
         <template v-else>
           <div class="employee-toolbar">
             <div class="employee-toolbar-title">
-              <span>角色：{{ selectedRole.name }}</span>
-              <el-tag type="success" size="small">已关联 {{ roleSelectedEmployeeIDs.length }} 人</el-tag>
+              <span>{{ selectedRole.name }}</span>
+              <el-tag type="success" size="small">已关联 {{ roleEmployeeList.length }} 人</el-tag>
             </div>
             <div class="employee-toolbar-actions">
-              <el-button size="small" @click="toggleRoleEmployeeSelections(true)">全选</el-button>
-              <el-button size="small" @click="toggleRoleEmployeeSelections(false)">清空</el-button>
-              <el-button type="primary" size="small" :loading="savingRoleEmployees" @click="handleSaveRoleEmployees">保存人员关联</el-button>
+              <el-button type="primary" size="small" @click="openEmployeeBindDrawer">关联人员</el-button>
             </div>
           </div>
 
           <el-table
-            ref="roleEmployeeTableRef"
             :data="roleEmployeeList"
             stripe
             size="small"
             row-key="id"
             height="calc(100% - 70px)"
             v-loading="loadingRoleEmployees"
-            @selection-change="handleRoleEmployeeSelectionChange"
           >
-            <el-table-column type="selection" width="48" />
             <el-table-column prop="name" label="员工姓名" min-width="120" />
             <el-table-column prop="phone" label="手机号" min-width="130" />
-            <el-table-column label="当前角色" min-width="140">
-              <template #default="{ row }">
-                <span>{{ row.position_info?.name || '-' }}</span>
-              </template>
-            </el-table-column>
+            <el-table-column prop="email" label="邮箱" min-width="180" />
             <el-table-column label="状态" width="90">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.status === 1 ? 'success' : 'info'">
@@ -184,6 +175,33 @@
     </el-dialog>
 
     <el-drawer
+      v-model="employeeBindDrawerVisible"
+      :title="`关联人员 - ${selectedRole?.name || ''}`"
+      direction="rtl"
+      size="420px"
+      destroy-on-close
+    >
+      <div v-loading="employeeBindLoading" class="employee-bind-drawer-body">
+        <div v-if="!employeeBindOptions.length" class="empty-placeholder" style="padding: 40px 0;">
+          暂无可关联人员
+        </div>
+
+        <el-checkbox-group v-else v-model="employeeBindSelectedIDs" class="employee-bind-list">
+          <div v-for="emp in employeeBindOptions" :key="emp.id" class="employee-bind-item">
+            <el-checkbox :label="emp.id">
+              <span>{{ emp.name }}</span>
+            </el-checkbox>
+          </div>
+        </el-checkbox-group>
+
+        <div class="employee-bind-footer">
+          <el-button @click="employeeBindDrawerVisible = false">取消</el-button>
+          <el-button type="primary" size="small" :loading="employeeBindSaving" @click="handleSaveEmployeeBind">保存</el-button>
+        </div>
+      </div>
+    </el-drawer>
+
+    <el-drawer
       v-model="permDrawerVisible"
       :title="`菜单权限设置 - ${activePosition.name || ''}`"
       direction="rtl"
@@ -241,9 +259,11 @@ const selectedRole = ref(null)
 
 const roleEmployeeList = ref([])
 const loadingRoleEmployees = ref(false)
-const savingRoleEmployees = ref(false)
-const roleSelectedEmployeeIDs = ref([])
-const roleEmployeeTableRef = ref()
+const employeeBindDrawerVisible = ref(false)
+const employeeBindLoading = ref(false)
+const employeeBindSaving = ref(false)
+const employeeBindOptions = ref([])
+const employeeBindSelectedIDs = ref([])
 
 const bindDialogVisible = ref(false)
 const bindSelectedPositionIDs = ref([])
@@ -334,23 +354,35 @@ const getFirstDept = (nodes) => {
   return nodes[0]
 }
 
-const setRoleEmployeeSelectionByIDs = async (ids = []) => {
-  await nextTick()
-  const table = roleEmployeeTableRef.value
-  if (!table) return
-  table.clearSelection()
-  const selectedSet = new Set(ids)
-  for (const row of roleEmployeeList.value) {
-    if (selectedSet.has(row.id)) {
-      table.toggleRowSelection(row, true)
-    }
+const fetchAllEmployees = async (params = {}) => {
+  const pageSize = 500
+  let page = 1
+  let total = 0
+  const result = []
+
+  while (true) {
+    const res = await getEmployees({
+      ...params,
+      page,
+      page_size: pageSize
+    })
+    const data = res.data?.data || {}
+    const list = data.list || []
+    total = Number(data.total || 0)
+    result.push(...list)
+    if (!list.length || result.length >= total || list.length < pageSize) break
+    page += 1
   }
+
+  return result.sort((a, b) => (a.id || 0) - (b.id || 0))
 }
 
 const clearSelectedRoleEmployees = () => {
   selectedRole.value = null
   roleEmployeeList.value = []
-  roleSelectedEmployeeIDs.value = []
+  employeeBindDrawerVisible.value = false
+  employeeBindOptions.value = []
+  employeeBindSelectedIDs.value = []
 }
 
 const loadRoleEmployees = async (role) => {
@@ -360,20 +392,15 @@ const loadRoleEmployees = async (role) => {
   }
 
   selectedRole.value = role
+  employeeBindDrawerVisible.value = false
+  employeeBindOptions.value = []
+  employeeBindSelectedIDs.value = []
   loadingRoleEmployees.value = true
   try {
-    const res = await getEmployees({
+    roleEmployeeList.value = await fetchAllEmployees({
       department_id: selectedDept.value.id,
-      page: 1,
-      page_size: 1000
+      position_id: role.id
     })
-    const list = res.data?.data?.list || []
-    roleEmployeeList.value = list.sort((a, b) => (a.id || 0) - (b.id || 0))
-    const selectedIDs = roleEmployeeList.value
-      .filter((item) => item.position_id === role.id)
-      .map((item) => item.id)
-    roleSelectedEmployeeIDs.value = selectedIDs
-    await setRoleEmployeeSelectionByIDs(selectedIDs)
   } finally {
     loadingRoleEmployees.value = false
   }
@@ -456,34 +483,42 @@ const handleRoleRowClick = async (row) => {
   await loadRoleEmployees(row)
 }
 
-const handleRoleEmployeeSelectionChange = (rows = []) => {
-  roleSelectedEmployeeIDs.value = rows.map((item) => item.id)
-}
-
-const toggleRoleEmployeeSelections = async (checked) => {
-  if (!roleEmployeeList.value.length) return
-  const ids = checked ? roleEmployeeList.value.map((item) => item.id) : []
-  roleSelectedEmployeeIDs.value = ids
-  await setRoleEmployeeSelectionByIDs(ids)
-}
-
-const handleSaveRoleEmployees = async () => {
+const openEmployeeBindDrawer = async () => {
   const roleID = selectedRole.value?.id
   const departmentID = selectedDept.value?.id
   if (!roleID || !departmentID) return
 
-  savingRoleEmployees.value = true
+  employeeBindDrawerVisible.value = true
+  employeeBindLoading.value = true
+  try {
+    const list = await fetchAllEmployees()
+    employeeBindOptions.value = list
+    employeeBindSelectedIDs.value = list
+      .filter((item) => item.position_id === roleID && item.department_id === departmentID)
+      .map((item) => item.id)
+  } finally {
+    employeeBindLoading.value = false
+  }
+}
+
+const handleSaveEmployeeBind = async () => {
+  const roleID = selectedRole.value?.id
+  const departmentID = selectedDept.value?.id
+  if (!roleID || !departmentID) return
+
+  employeeBindSaving.value = true
   try {
     await setPositionEmployees(roleID, {
       department_id: departmentID,
-      employee_ids: roleSelectedEmployeeIDs.value
+      employee_ids: employeeBindSelectedIDs.value
     })
     ElMessage.success('人员关联保存成功')
+    employeeBindDrawerVisible.value = false
     await loadRoleEmployees(selectedRole.value)
   } catch (error) {
     ElMessage.error(extractErrorMessage(error, '人员关联保存失败'))
   } finally {
-    savingRoleEmployees.value = false
+    employeeBindSaving.value = false
   }
 }
 
@@ -894,6 +929,38 @@ onMounted(async () => {
 
 :deep(.role-row-active > td) {
   background: #ecf5ff !important;
+}
+
+.employee-bind-drawer-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.employee-bind-list {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.employee-bind-item {
+  padding: 6px 0;
+  border-bottom: 1px dashed #f0f2f5;
+}
+
+.employee-bind-item:last-child {
+  border-bottom: none;
+}
+
+.employee-bind-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .perm-drawer-body {
