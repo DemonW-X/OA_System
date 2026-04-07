@@ -347,6 +347,15 @@ const formatDate = (dateStr) => {
   })
 }
 
+const isAuthExpiredError = (error) => {
+  return error?.response?.status === 401 || error?.__authExpired
+}
+
+const showErrorIfNeeded = (error, message) => {
+  if (isAuthExpiredError(error)) return
+  ElMessage.error(message)
+}
+
 const openNotice = (item) => {
   currentNotice.value = item
   dialogVisible.value = true
@@ -411,8 +420,8 @@ const openApproval = async (item) => {
     approvalForm.value = { action: 'approved', remark: '' }
     allApprovalsDialogVisible.value = false
     approvalDialogVisible.value = true
-  } catch {
-    ElMessage.error('【待我审核】获取详情失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【待我审核】获取详情失败')
   }
 }
 
@@ -436,8 +445,8 @@ const openApprovalReadonly = async (item) => {
     }
     approvalDetail.value = { ...item, detail, summary }
     approvalDialogVisible.value = true
-  } catch {
-    ElMessage.error('获取详情失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '获取详情失败')
   }
 }
 
@@ -446,8 +455,8 @@ const openAllApprovalsDialog = async () => {
     const res = await getMyPendingApprovals({ limit: 1000 })
     allPendingApprovals.value = res.data?.data || []
     allApprovalsDialogVisible.value = true
-  } catch {
-    ElMessage.error('【待我审核】获取数据失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【待我审核】获取数据失败')
   }
 }
 
@@ -461,8 +470,8 @@ const loadPending = async (page = 1) => {
     const res = await getMyPendingApprovals({ page, page_size: pageSize })
     pendingApprovals.value = res.data?.data?.list || res.data?.data || []
     pendingTotal.value = res.data?.data?.total || pendingApprovals.value.length
-  } catch {
-    ElMessage.error('【我的待审】获取数据失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【我的待审】获取数据失败')
   }
 }
 
@@ -472,8 +481,8 @@ const loadApproved = async (page = 1) => {
     const res = await getMyApprovedApprovals({ page, page_size: pageSize })
     approvedList.value = res.data?.data?.list || res.data?.data || []
     approvedTotal.value = res.data?.total || res.data?.data?.total || approvedList.value.length
-  } catch {
-    ElMessage.error('【我的已审】获取数据失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【我的已审】获取数据失败')
   }
 }
 
@@ -483,8 +492,8 @@ const loadPendingRead = async (page = 1) => {
     const res = await getMyPendingReads({ page, page_size: pageSize })
     pendingReadList.value = res.data?.data?.list || res.data?.data || []
     pendingReadTotal.value = res.data?.total || res.data?.data?.total || pendingReadList.value.length
-  } catch {
-    ElMessage.error('【我的待阅】获取数据失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【我的待阅】获取数据失败')
   }
 }
 
@@ -494,8 +503,8 @@ const loadRead = async (page = 1) => {
     const res = await getMyReadItems({ page, page_size: pageSize })
     readList.value = res.data?.data?.list || res.data?.data || []
     readTotal.value = res.data?.total || res.data?.data?.total || readList.value.length
-  } catch {
-    ElMessage.error('【我的已阅】获取数据失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【我的已阅】获取数据失败')
   }
 }
 
@@ -512,7 +521,7 @@ const loadAllAuditPending = async (page = 1) => {
     const res = await getMyPendingApprovals({ page, page_size: allAuditPageSize })
     allAuditPendingList.value = res.data?.data?.list || res.data?.data || []
     allAuditPendingTotal.value = res.data?.data?.total || allAuditPendingList.value.length
-  } catch { ElMessage.error('获取待审数据失败') }
+  } catch (error) { showErrorIfNeeded(error, '获取待审数据失败') }
 }
 
 const loadAllAuditApproved = async (page = 1) => {
@@ -521,7 +530,7 @@ const loadAllAuditApproved = async (page = 1) => {
     const res = await getMyApprovedApprovals({ page, page_size: allAuditPageSize })
     allAuditApprovedList.value = res.data?.data?.list || res.data?.data || []
     allAuditApprovedTotal.value = res.data?.data?.total || allAuditApprovedList.value.length
-  } catch { ElMessage.error('获取已审数据失败') }
+  } catch (error) { showErrorIfNeeded(error, '获取已审数据失败') }
 }
 
 const loadAllAuditPendingRead = async (page = 1) => {
@@ -530,7 +539,7 @@ const loadAllAuditPendingRead = async (page = 1) => {
     const res = await getMyPendingReads({ page, page_size: allAuditPageSize })
     allAuditPendingReadList.value = res.data?.data?.list || res.data?.data || []
     allAuditPendingReadTotal.value = res.data?.data?.total || allAuditPendingReadList.value.length
-  } catch { ElMessage.error('获取待阅数据失败') }
+  } catch (error) { showErrorIfNeeded(error, '获取待阅数据失败') }
 }
 
 const loadAllAuditRead = async (page = 1) => {
@@ -539,7 +548,7 @@ const loadAllAuditRead = async (page = 1) => {
     const res = await getMyReadItems({ page, page_size: allAuditPageSize })
     allAuditReadList.value = res.data?.data?.list || res.data?.data || []
     allAuditReadTotal.value = res.data?.data?.total || allAuditReadList.value.length
-  } catch { ElMessage.error('获取已阅数据失败') }
+  } catch (error) { showErrorIfNeeded(error, '获取已阅数据失败') }
 }
 
 const openAllAuditDialog = async () => {
@@ -579,8 +588,8 @@ const submitApproval = async (action) => {
     approvalDialogVisible.value = false
     approvalDetail.value = null
     await reloadApprovals()
-  } catch {
-    ElMessage.error('审核操作失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '审核操作失败')
   } finally {
     approvalSubmitting.value = false
   }
@@ -591,8 +600,8 @@ const openAllNoticesDialog = async () => {
     const res = await getNotices({ page: 1, page_size: 1000 })
     allNoticeList.value = res.data?.data?.list || []
     allNoticesDialogVisible.value = true
-  } catch {
-    ElMessage.error('【公告栏】获取数据失败')
+  } catch (error) {
+    showErrorIfNeeded(error, '【公告栏】获取数据失败')
   }
 }
 
@@ -609,7 +618,7 @@ onMounted(async () => {
   results.forEach((result, idx) => {
     const task = tasks[idx]
     if (result.status === 'rejected') {
-      ElMessage.error(`【${task.label}】获取数据失败`)
+      showErrorIfNeeded(result.reason, `【${task.label}】获取数据失败`)
       return
     }
 

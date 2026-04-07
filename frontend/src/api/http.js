@@ -2,6 +2,8 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
 
+let isHandlingAuthError = false
+
 const http = axios.create({
   baseURL: '/api',
   timeout: 5000
@@ -21,10 +23,17 @@ http.interceptors.response.use(
   res => res,
   err => {
     if (err.response?.status === 401 && !err.config.url.includes('/login')) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
-      router.push('/login')
-      ElMessage.error('登录已过期，请重新登录')
+      if (!isHandlingAuthError) {
+        isHandlingAuthError = true
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
+        router.push('/login')
+        ElMessage.error('登录已过期，请重新登录')
+        setTimeout(() => {
+          isHandlingAuthError = false
+        }, 800)
+      }
+      err.__authExpired = true
     } else {
       ElMessage.error(err.response?.data?.msg || '请求失败')
     }
