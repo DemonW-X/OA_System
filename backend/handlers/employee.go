@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"regexp"
 
@@ -14,15 +15,6 @@ var (
 	phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 )
-
-type EmployeeRequest struct {
-	Name         string `json:"name" binding:"required"`
-	Phone        string `json:"phone"`
-	Email        string `json:"email"`
-	DepartmentID int    `json:"department_id"`
-	PositionID   int    `json:"position_id"`
-	Status       int    `json:"status"`
-}
 
 func validateEmployee(phone, email string) (string, bool) {
 	if phone != "" && !phoneRegex.MatchString(phone) {
@@ -80,7 +72,7 @@ func GetEmployee(c *gin.Context) {
 }
 
 func CreateEmployee(c *gin.Context) {
-	var req EmployeeRequest
+	var req dto.EmployeeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -157,7 +149,7 @@ func UpdateEmployee(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "员工不存在"})
 		return
 	}
-	var req EmployeeRequest
+	var req dto.EmployeeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -309,10 +301,7 @@ func ApproveEmployee(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "员工不存在"})
 		return
 	}
-	var req struct {
-		Action string `json:"action" binding:"required"` // approved / rejected
-		Remark string `json:"remark"`
-	}
+	var req dto.EmployeeApproveRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

@@ -24,8 +24,8 @@ var allowedFileTypes = map[string]bool{
 	".txt": true, ".zip": true, ".rar": true,
 }
 
-const maxImageSize = 5 << 20  // 5MB
-const maxFileSize = 20 << 20  // 20MB
+const maxImageSize = 5 << 20 // 5MB
+const maxFileSize = 20 << 20 // 20MB
 
 func UploadImage(c *gin.Context) {
 	file, err := c.FormFile("file")

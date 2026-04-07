@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"sort"
 	"strings"
@@ -10,35 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type MenuRequest struct {
-	Name           string `json:"name" binding:"required"`
-	Icon           string `json:"icon"`
-	Path           string `json:"path"`
-	SortCode       int    `json:"sort_code"`
-	ParentID       int    `json:"parent_id"`
-	Visible        *bool  `json:"visible"`
-	Remark         string `json:"remark"`
-	EnableWorkflow bool   `json:"enable_workflow"` // 是否启用审批流
-	BizCode        string `json:"biz_code"`        // 业务编码，如 leave_request
-	BizName        string `json:"biz_name"`        // 业务名称，如 请假审批
-	BizSort        int    `json:"biz_sort"`        // 排序
-}
-
-type MenuTreeItem struct {
-	ID             int            `json:"id"`
-	Name           string         `json:"name"`
-	Icon           string         `json:"icon"`
-	Path           string         `json:"path"`
-	SortCode       int            `json:"sort_code"`
-	ParentID       int            `json:"parent_id"`
-	Visible        bool           `json:"visible"`
-	Remark         string         `json:"remark"`
-	EnableWorkflow bool           `json:"enable_workflow"`
-	BizCode        string         `json:"biz_code"`
-	BizName        string         `json:"biz_name"`
-	BizSort        int            `json:"biz_sort"`
-	Children       []MenuTreeItem `json:"children"`
-}
+type MenuRequest = dto.MenuRequestDTO
+type MenuTreeItem = dto.MenuTreeItemDTO
 
 func buildMenuTree(list []models.Menu) []MenuTreeItem {
 	// 预加载所有审批流配置，避免 N+1

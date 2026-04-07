@@ -3,16 +3,11 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 
 	"github.com/gin-gonic/gin"
 )
-
-type DepartmentRequest struct {
-	Name     string `json:"name" binding:"required"`
-	ParentID *int   `json:"parent_id"`
-	Remark   string `json:"remark"`
-}
 
 func calcDepartmentLevel(parentID *int) (int, error) {
 	if parentID == nil {
@@ -88,7 +83,7 @@ func GetDepartments(c *gin.Context) {
 }
 
 func CreateDepartment(c *gin.Context) {
-	var req DepartmentRequest
+	var req dto.DepartmentRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -120,7 +115,7 @@ func UpdateDepartment(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "部门不存在"})
 		return
 	}
-	var req DepartmentRequest
+	var req dto.DepartmentRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

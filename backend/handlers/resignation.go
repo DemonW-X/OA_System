@@ -3,23 +3,15 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-type ResignationRequest struct {
-	EmployeeID int    `json:"employee_id" binding:"required"`
-	ResignDate string `json:"resign_date" binding:"required"` // yyyy-MM-dd
-	Reason     string `json:"reason"`
-	Remark     string `json:"remark"`
-}
-
-type ResignationApproveReq struct {
-	Action string `json:"action" binding:"required"` // approved/rejected
-	Remark string `json:"remark"`
-}
+type ResignationRequest = dto.ResignationRequestDTO
+type ResignationApproveReq = dto.ResignationApproveRequestDTO
 
 func GetResignations(c *gin.Context) {
 	var list []models.Resignation

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 
 	"github.com/gin-gonic/gin"
@@ -47,11 +48,7 @@ func GetBizTypes(c *gin.Context) {
 
 // CreateBizType 新增业务类型
 func CreateBizType(c *gin.Context) {
-	var req struct {
-		Code string `json:"code" binding:"required"`
-		Name string `json:"name" binding:"required"`
-		Sort int    `json:"sort"`
-	}
+	var req dto.WorkflowBizTypeCreateRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -81,23 +78,8 @@ func DeleteBizType(c *gin.Context) {
 	writeLog(c, "业务类型", "删除", "删除业务类型："+biz.Name)
 }
 
-type WorkflowNodeInput struct {
-	Sort          int    `json:"sort"`
-	Name          string `json:"name" binding:"required"`
-	ApproveType   string `json:"approve_type"`
-	Approvers     string `json:"approvers"`
-	Conditions    string `json:"conditions"`
-	AllowSkip     bool   `json:"allow_skip"`
-	AllowTransfer bool   `json:"allow_transfer"`
-	ParentIDs     string `json:"parent_ids"` // JSON数组，存父节点sort值
-}
-
-type WorkflowTemplateRequest struct {
-	Name        string              `json:"name" binding:"required"`
-	Description string              `json:"description"`
-	BizType     string              `json:"biz_type"`
-	Nodes       []WorkflowNodeInput `json:"nodes"`
-}
+type WorkflowNodeInput = dto.WorkflowNodeInputDTO
+type WorkflowTemplateRequest = dto.WorkflowTemplateRequestDTO
 
 func GetWorkflowTemplates(c *gin.Context) {
 	var list []models.WorkflowTemplate

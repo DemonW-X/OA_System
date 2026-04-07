@@ -59,7 +59,6 @@
             @row-click="handleRoleRowClick"
           >
             <el-table-column prop="name" label="角色名称" min-width="150" />
-            <el-table-column prop="remark" label="备注" min-width="140" />
             <el-table-column label="操作" width="250" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="openPermDrawer(row)">权限设置</el-button>

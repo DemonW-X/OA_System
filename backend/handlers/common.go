@@ -68,10 +68,10 @@ func parseID(c *gin.Context) (int, bool) {
 }
 
 type PageResult struct {
-	List      interface{} `json:"list"`
-	Total     int64       `json:"total"`
-	Page      int         `json:"page"`
-	PageSize  int         `json:"page_size"`
+	List     interface{} `json:"list"`
+	Total    int64       `json:"total"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"page_size"`
 }
 
 func getPagination(c *gin.Context) (page, pageSize, offset int) {

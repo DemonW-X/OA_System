@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"net/http"
-	"regexp"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/middleware"
 	"oa-system/models"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -25,13 +26,8 @@ func isValidPassword(pwd string) bool {
 		pwdHasDigit.MatchString(pwd)
 }
 
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
 func Login(c *gin.Context) {
-	var req LoginRequest
+	var req dto.AuthLoginRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "参数错误"})
 		return
@@ -77,11 +73,6 @@ func GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": user})
 }
 
-type UpdateProfileRequest struct {
-	Username string `json:"username" binding:"required"`
-	RealName string `json:"real_name"`
-}
-
 func UpdateProfile(c *gin.Context) {
 	userID := c.GetInt("userID")
 	var user models.User
@@ -89,7 +80,7 @@ func UpdateProfile(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "用户不存在"})
 		return
 	}
-	var req UpdateProfileRequest
+	var req dto.AuthUpdateProfileRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -109,11 +100,6 @@ func UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": user, "msg": "更新成功"})
 }
 
-type ChangePasswordRequest struct {
-	OldPassword string `json:"old_password" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required"`
-}
-
 func ChangePassword(c *gin.Context) {
 	userID := c.GetInt("userID")
 	var user models.User
@@ -121,7 +107,7 @@ func ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "用户不存在"})
 		return
 	}
-	var req ChangePasswordRequest
+	var req dto.AuthChangePasswordRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

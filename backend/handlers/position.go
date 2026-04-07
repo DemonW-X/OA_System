@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"sort"
 	"strings"
@@ -10,20 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type PositionRequest struct {
-	Name         string `json:"name" binding:"required"`
-	DepartmentID int    `json:"department_id"`
-	Remark       string `json:"remark"`
-}
-
-type PositionMenuPermissionRequest struct {
-	MenuIDs []int `json:"menu_ids"`
-}
-
-type PositionEmployeeRelationRequest struct {
-	DepartmentID int   `json:"department_id"`
-	EmployeeIDs  []int `json:"employee_ids"`
-}
+type PositionRequest = dto.PositionRequestDTO
+type PositionMenuPermissionRequest = dto.PositionMenuPermissionRequestDTO
+type PositionEmployeeRelationRequest = dto.PositionEmployeeRelationRequestDTO
 
 func GetPositions(c *gin.Context) {
 	var list []models.Position

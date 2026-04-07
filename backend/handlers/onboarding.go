@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"time"
 
@@ -10,26 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type OnboardingRequest struct {
-	EmployeeName   string `json:"employee_name" binding:"required"`
-	OnboardDate    string `json:"onboard_date" binding:"required"` // yyyy-MM-dd
-	OnboardType    string `json:"onboard_type"`                    // new/rehire/transfer
-	ProbationDays  int    `json:"probation_days"`
-	IDCard         string `json:"id_card" binding:"required"`
-	Phone          string `json:"phone" binding:"required"`
-	Email          string `json:"email" binding:"required,email"`
-	NativePlace    string `json:"native_place"`
-	Address        string `json:"address"`
-	EmergencyName  string `json:"emergency_name"`
-	EmergencyPhone string `json:"emergency_phone"`
-	Education      string `json:"education"`
-	School         string `json:"school"`
-	Major          string `json:"major"`
-	WorkYears      int    `json:"work_years"`
-	DepartmentID   int    `json:"department_id"`
-	PositionID     int    `json:"position_id"`
-	Remark         string `json:"remark"`
-}
+type OnboardingRequest = dto.OnboardingRequestDTO
 
 func GetOnboardings(c *gin.Context) {
 	var list []models.Onboarding
@@ -316,10 +298,7 @@ func ApproveOnboarding(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅待审批状态可审批"})
 		return
 	}
-	var req struct {
-		Action string `json:"action" binding:"required"` // approved/rejected
-		Remark string `json:"remark"`
-	}
+	var req dto.OnboardingApproveRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

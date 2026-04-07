@@ -3,19 +3,12 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
-
-type CalendarEventRequest struct {
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description"`
-	StartTime   string `json:"start_time" binding:"required"`
-	EndTime     string `json:"end_time" binding:"required"`
-	Type        string `json:"type"`
-}
 
 const timeLayout = "2006-01-02 15:04:05"
 
@@ -32,7 +25,7 @@ func GetCalendarEvents(c *gin.Context) {
 }
 
 func CreateCalendarEvent(c *gin.Context) {
-	var req CalendarEventRequest
+	var req dto.CalendarEventRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -85,7 +78,7 @@ func UpdateCalendarEvent(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "事件不存在"})
 		return
 	}
-	var req CalendarEventRequest
+	var req dto.CalendarEventRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

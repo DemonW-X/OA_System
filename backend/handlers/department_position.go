@@ -4,16 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-type DepartmentPositionRequest struct {
-	DepartmentID int `json:"department_id" binding:"required"`
-	PositionID   int `json:"position_id" binding:"required"`
-}
 
 func GetDepartmentPositions(c *gin.Context) {
 	var list []models.DepartmentPosition
@@ -33,15 +29,36 @@ func GetDepartmentPositions(c *gin.Context) {
 	page, pageSize, offset := getPagination(c)
 	query.Order("id asc").Offset(offset).Limit(pageSize).Find(&list)
 
-	c.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
+	listResp := make([]dto.DepartmentPositionListItemDTO, 0, len(list))
+	for _, item := range list {
+		listResp = append(listResp, dto.DepartmentPositionListItemDTO{
+			ID:           item.ID,
+			DepartmentID: item.DepartmentID,
+			Department:   item.Department,
+			PositionID:   item.PositionID,
+			Position: dto.PositionLiteDTO{
+				ID:   item.Position.ID,
+				Name: item.Position.Name,
+			},
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, dto.DepartmentPositionListResponseDTO{
+		Code: 0,
+		Data: dto.DepartmentPositionListDataDTO{
+			List:     listResp,
+			Total:    total,
+			Page:     page,
+			PageSize: pageSize,
+		},
 	})
 	writeLog(c, "角色管理", "查询", "查询部门-职位关系列表")
 }
 
 func CreateDepartmentPosition(c *gin.Context) {
-	var req DepartmentPositionRequest
+	var req dto.DepartmentPositionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

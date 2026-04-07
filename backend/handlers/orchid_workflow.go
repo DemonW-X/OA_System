@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"strconv"
 
@@ -11,19 +12,8 @@ import (
 	"github.com/kyodo-tech/orchid"
 )
 
-type OrchidWorkflowDefinitionReq struct {
-	Name        string `json:"name" binding:"required"`
-	BizType     string `json:"biz_type" binding:"required"`
-	Description string `json:"description"`
-	DagJSON     string `json:"dag_json" binding:"required"`
-	IsActive    bool   `json:"is_active"`
-}
-
-type TransferOrSkipReq struct {
-	FromUserID int    `json:"from_user_id"`
-	ToUserID   int    `json:"to_user_id"`
-	Remark     string `json:"remark"`
-}
+type OrchidWorkflowDefinitionReq = dto.OrchidWorkflowDefinitionRequestDTO
+type TransferOrSkipReq = dto.OrchidTransferOrSkipRequestDTO
 
 func validateOrchidDag(name, dagJSON string) error {
 	wf := orchid.NewWorkflow(name)
@@ -196,17 +186,7 @@ func GetOrchidWorkflowHistories(c *gin.Context) {
 	}})
 }
 
-type PendingApprovalItem struct {
-	TaskID     int    `json:"task_id"`
-	BizType    string `json:"biz_type"`
-	BizID      int    `json:"biz_id"`
-	NodeKey    string `json:"node_key"`
-	Title      string `json:"title"`
-	Status     string `json:"status"`
-	CreatedAt  string `json:"created_at"`
-	DetailPath string `json:"detail_path"`
-	InstanceID int    `json:"instance_id"`
-}
+type PendingApprovalItem = dto.OrchidPendingApprovalItemDTO
 
 func buildApprovalTitle(ins models.OrchidWorkflowInstance) string {
 	switch ins.BizType {

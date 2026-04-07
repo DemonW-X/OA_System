@@ -3,25 +3,12 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
-
-type EventBookingRequest struct {
-	Title         string `json:"title" binding:"required"`
-	Description   string `json:"description"`
-	Type          string `json:"type" binding:"required"`
-	StartTime     string `json:"start_time" binding:"required"`
-	EndTime       string `json:"end_time" binding:"required"`
-	MeetingRoomID int    `json:"meeting_room_id"`
-	Participants  string `json:"participants"`
-}
-
-type EventBookingSubmit struct {
-	Remark string `json:"remark"`
-}
 
 func GetEventBookings(c *gin.Context) {
 	var list []models.EventBooking
@@ -60,7 +47,7 @@ func GetEventBooking(c *gin.Context) {
 }
 
 func CreateEventBooking(c *gin.Context) {
-	var req EventBookingRequest
+	var req dto.EventBookingRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -129,7 +116,7 @@ func UpdateEventBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅草稿状态可修改"})
 		return
 	}
-	var req EventBookingRequest
+	var req dto.EventBookingRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -188,7 +175,7 @@ func SubmitEventBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅草稿状态可提交"})
 		return
 	}
-	var req EventBookingSubmit
+	var req dto.EventBookingSubmitRequestDTO
 	_ = c.ShouldBindJSON(&req)
 	op := currentOperator(c)
 	ret, err := submitApprovalFlow("event_booking", booking.ID, op)
@@ -224,10 +211,7 @@ func ApproveEventBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅待审核状态可审批"})
 		return
 	}
-	var req struct {
-		Status       string `json:"status" binding:"required"` // approved/rejected
-		RejectReason string `json:"reject_reason"`
-	}
+	var req dto.EventBookingApproveRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

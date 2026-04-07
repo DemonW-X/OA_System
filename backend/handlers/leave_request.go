@@ -4,39 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-type LeaveRequestCreate struct {
-	EmployeeID int     `json:"employee_id" binding:"required"`
-	Type       string  `json:"type" binding:"required"`
-	StartDate  string  `json:"start_date" binding:"required"`
-	EndDate    string  `json:"end_date" binding:"required"`
-	Days       float64 `json:"days" binding:"required"`
-	Reason     string  `json:"reason"`
-}
-
-type LeaveRequestApprove struct {
-	Status       string `json:"status" binding:"required"` // approved/rejected
-	RejectReason string `json:"reject_reason"`
-}
-
-type LeaveRequestSubmit struct {
-	Remark string `json:"remark"`
-}
-
 const dateLayout = "2006-01-02"
 
-type flowLogEntry struct {
-	Time     string `json:"time"`
-	Node     string `json:"node"`
-	Action   string `json:"action"`
-	Operator string `json:"operator"`
-	Remark   string `json:"remark,omitempty"`
-}
+type flowLogEntry = dto.LeaveFlowLogEntryDTO
 
 func appendFlowLog(raw string, entry flowLogEntry) string {
 	logs := []flowLogEntry{}
@@ -96,7 +73,7 @@ func GetLeaveRequest(c *gin.Context) {
 }
 
 func CreateLeaveRequest(c *gin.Context) {
-	var req LeaveRequestCreate
+	var req dto.LeaveRequestCreateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -147,7 +124,7 @@ func UpdateLeaveRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅草稿状态可修改"})
 		return
 	}
-	var req LeaveRequestCreate
+	var req dto.LeaveRequestCreateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -194,7 +171,7 @@ func SubmitLeaveRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅草稿状态可提交"})
 		return
 	}
-	var req LeaveRequestSubmit
+	var req dto.LeaveRequestSubmitDTO
 	_ = c.ShouldBindJSON(&req)
 	op := currentOperator(c)
 	ret, err := submitApprovalFlow("leave_request", leave.ID, op)
@@ -230,7 +207,7 @@ func ApproveLeaveRequest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "仅待审核状态可审批"})
 		return
 	}
-	var req LeaveRequestApprove
+	var req dto.LeaveRequestApproveDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

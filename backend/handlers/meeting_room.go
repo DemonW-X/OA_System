@@ -3,18 +3,11 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 
 	"github.com/gin-gonic/gin"
 )
-
-type MeetingRoomRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Location string `json:"location"`
-	Capacity int    `json:"capacity"`
-	Status   int    `json:"status"`
-	Remark   string `json:"remark"`
-}
 
 func GetMeetingRooms(c *gin.Context) {
 	var list []models.MeetingRoom
@@ -37,7 +30,7 @@ func GetMeetingRooms(c *gin.Context) {
 }
 
 func CreateMeetingRoom(c *gin.Context) {
-	var req MeetingRoomRequest
+	var req dto.MeetingRoomRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
@@ -74,7 +67,7 @@ func UpdateMeetingRoom(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "会议室不存在"})
 		return
 	}
-	var req MeetingRoomRequest
+	var req dto.MeetingRoomRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return

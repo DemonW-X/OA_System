@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"oa-system/database"
+	"oa-system/dto"
 	"oa-system/models"
 
 	"github.com/gin-gonic/gin"
@@ -17,22 +18,9 @@ var richTextPolicy = func() *bluemonday.Policy {
 	return p
 }()
 
-type NoticeRequest struct {
-	Title        string `json:"title" binding:"required"`
-	Content      string `json:"content"`
-	Status       int    `json:"status"`
-	Attachments  string `json:"attachments"`
-	DepartmentID int    `json:"department_id"`
-}
-
-type NoticeSubmitReq struct {
-	Remark string `json:"remark"`
-}
-
-type NoticeApproveReq struct {
-	Action string `json:"action" binding:"required"` // approved/rejected
-	Remark string `json:"remark"`
-}
+type NoticeRequest = dto.NoticeRequestDTO
+type NoticeSubmitReq = dto.NoticeSubmitRequestDTO
+type NoticeApproveReq = dto.NoticeApproveRequestDTO
 
 func noticeApproveStatusTagToInt(status string) int {
 	switch status {
