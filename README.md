@@ -132,22 +132,6 @@ Vite 代理配置修改：
 
 ---
 
-## 7. 构建
-
-### 后端编译
-```bash
-cd backend
-go build ./...
-```
-
-### 前端构建
-```bash
-cd frontend
-npm run build
-```
-
----
-
-## 8. License
+## 7. License
 
 内部项目，按团队规范使用。
