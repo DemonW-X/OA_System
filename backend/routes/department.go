@@ -11,4 +11,6 @@ func departmentRoutes(rg *gin.RouterGroup) {
 	rg.POST("/departments", handlers.CreateDepartment)
 	rg.PUT("/departments/:id", handlers.UpdateDepartment)
 	rg.DELETE("/departments/:id", handlers.DeleteDepartment)
+	rg.GET("/departments/:id/menu-permissions", handlers.GetDepartmentMenuPermissions)
+	rg.PUT("/departments/:id/menu-permissions", handlers.SetDepartmentMenuPermissions)
 }

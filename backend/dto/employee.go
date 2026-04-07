@@ -13,3 +13,8 @@ type EmployeeApproveRequestDTO struct {
 	Action string `json:"action" binding:"required"` // approved / rejected
 	Remark string `json:"remark"`
 }
+
+type EmployeeNameItemDTO struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}

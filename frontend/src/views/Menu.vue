@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-card shadow="never" style="border:none">
     <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="关键字">
@@ -7,6 +7,9 @@
       <el-form-item>
         <el-button type="primary" @click="loadData">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
+      </el-form-item>
+      <el-form-item style="margin-left:auto;">
+        <el-button type="primary" @click="openDialog()">新增菜单</el-button>
       </el-form-item>
     </el-form>
 

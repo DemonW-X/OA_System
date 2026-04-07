@@ -27,6 +27,39 @@ func validateEmployee(phone, email string) (string, bool) {
 }
 
 func GetEmployees(c *gin.Context) {
+	nameOnly := c.Query("name_only") == "1"
+	if nameOnly {
+		var list []dto.EmployeeNameItemDTO
+		query := database.DB.Model(&models.Employee{})
+		keyword := c.Query("keyword")
+		if keyword == "" {
+			keyword = c.Query("name")
+		}
+		if keyword != "" {
+			like := "%" + keyword + "%"
+			query = query.Where("name LIKE ?", like)
+		}
+		if deptID := c.Query("department_id"); deptID != "" {
+			query = query.Where("department_id = ?", deptID)
+		}
+		if posID := c.Query("position_id"); posID != "" {
+			query = query.Where("position_id = ?", posID)
+		}
+		if status := c.Query("status"); status != "" {
+			query = query.Where("status = ?", status)
+		}
+		var total int64
+		query.Count(&total)
+		page, pageSize, offset := getPagination(c)
+		query.Select("id", "name").Order("id asc").Offset(offset).Limit(pageSize).Scan(&list)
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
+		})
+		writeLog(c, "员工管理", "查询", "查询员工列表")
+		return
+	}
+
 	var list []models.Employee
 	query := database.DB.Model(&models.Employee{}).Preload("Department").Preload("PositionInfo")
 	keyword := c.Query("keyword")

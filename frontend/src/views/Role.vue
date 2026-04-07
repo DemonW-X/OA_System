@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-card shadow="never">
     <div class="role-page">
       <div class="dept-panel">
@@ -23,6 +23,7 @@
               <span class="dept-node-actions" @click.stop>
                 <el-button :icon="Plus" type="primary" size="small" circle plain @click.stop="openDeptDialog(null, data.id)" />
                 <el-button :icon="Edit" type="warning" size="small" circle plain @click.stop="openDeptDialog(data)" />
+                <el-button :icon="Setting" type="success" size="small" circle plain @click.stop="openDeptPermDrawer(data)" />
                 <el-button :icon="Minus" type="danger" size="small" circle plain @click.stop="handleDeptDelete(data.id)" />
               </span>
             </div>
@@ -34,7 +35,6 @@
         <div v-if="!selectedDept" class="empty-placeholder">
           请在左侧选择部门后管理角色
         </div>
-
         <template v-else>
           <div class="role-toolbar">
             <div class="role-toolbar-title">
@@ -43,8 +43,8 @@
             </div>
 
             <div class="role-toolbar-actions">
-              <el-button type="primary" size="small" plain @click="openBindDialog">关联已有角色</el-button>
-              <el-button type="primary" size="small" @click="openPositionDialog()">新建角色并关联</el-button>
+              <el-button :icon="Plus" type="primary" size="small" plain @click="openBindDialog">关联已有角色</el-button>
+              <el-button :icon="Plus" type="primary" size="small" plain @click="openPositionDialog()">新建角色并关联</el-button>
             </div>
           </div>
 
@@ -59,12 +59,14 @@
             @row-click="handleRoleRowClick"
           >
             <el-table-column prop="name" label="角色名称" min-width="150" />
-            <el-table-column label="操作" width="250" fixed="right">
+            <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
-                <el-button link type="primary" size="small" @click="openPermDrawer(row)">权限设置</el-button>
-                <el-button link size="small" @click="openPositionDialog(row)">编辑</el-button>
-                <el-button link type="warning" size="small" @click="handleRemoveRelation(row)">移除</el-button>
-                <el-button link type="danger" size="small" @click="handleDeletePosition(row)">删除</el-button>
+                <span class="role-row-actions" @click.stop>
+                  <el-button :icon="Setting" type="primary" size="small" circle plain title="权限设置" @click.stop="openPermDrawer(row)" />
+                  <el-button :icon="Edit" type="warning" size="small" circle plain title="编辑" @click.stop="openPositionDialog(row)" />
+                  <el-button :icon="Minus" type="info" size="small" circle plain title="移除关联" @click.stop="handleRemoveRelation(row)" />
+                  <el-button :icon="Delete" type="danger" size="small" circle plain title="删除角色" @click.stop="handleDeletePosition(row)" />
+                </span>
               </template>
             </el-table-column>
           </el-table>
@@ -79,7 +81,6 @@
         <div v-else-if="!selectedRole" class="empty-placeholder">
           请点击中间角色，查看并配置该角色的人员关联
         </div>
-
         <template v-else>
           <div class="employee-toolbar">
             <div class="employee-toolbar-title">
@@ -87,7 +88,7 @@
               <el-tag type="success" size="small">已关联 {{ roleEmployeeList.length }} 人</el-tag>
             </div>
             <div class="employee-toolbar-actions">
-              <el-button type="primary" size="small" @click="openEmployeeBindDrawer">关联人员</el-button>
+              <el-button :icon="Plus" type="primary" size="small" plain @click="openEmployeeBindDrawer">关联人员</el-button>
             </div>
           </div>
 
@@ -100,13 +101,11 @@
             v-loading="loadingRoleEmployees"
           >
             <el-table-column prop="name" label="员工姓名" min-width="120" />
-            <el-table-column prop="phone" label="手机号" min-width="130" />
-            <el-table-column prop="email" label="邮箱" min-width="180" />
-            <el-table-column label="状态" width="90">
+            <el-table-column label="操作" width="92" fixed="right">
               <template #default="{ row }">
-                <el-tag size="small" :type="row.status === 1 ? 'success' : 'info'">
-                  {{ row.status === 1 ? '在职' : '离职' }}
-                </el-tag>
+                <span class="employee-row-actions" @click.stop>
+                  <el-button :icon="Setting" type="warning" size="small" circle plain title="权限设置" @click.stop="openEmployeePermEdit(row)" />
+                </span>
               </template>
             </el-table-column>
           </el-table>
@@ -116,7 +115,7 @@
 
     <el-dialog
       v-model="bindDialogVisible"
-      :title="selectedDept ? `关联已有角色到「${selectedDept.name}」` : '关联已有角色'"
+      :title="selectedDept ? `关联已有角色到【${selectedDept.name}】` : '关联已有角色'"
       width="520px"
     >
       <div class="bind-dialog-body">
@@ -184,7 +183,6 @@
         <div v-if="!employeeBindOptions.length" class="empty-placeholder" style="padding: 40px 0;">
           暂无可关联人员
         </div>
-
         <el-checkbox-group v-else v-model="employeeBindSelectedIDs" class="employee-bind-list">
           <div v-for="emp in employeeBindOptions" :key="emp.id" class="employee-bind-item">
             <el-checkbox :label="emp.id">
@@ -202,20 +200,20 @@
 
     <el-drawer
       v-model="permDrawerVisible"
-      :title="`菜单权限设置 - ${activePosition.name || ''}`"
+      :title="permDrawerTitle"
       direction="rtl"
       size="460px"
       destroy-on-close
     >
       <div v-loading="permLoading" class="perm-drawer-body">
-        <div class="perm-header-actions">
+        <div v-if="!permReadOnly" class="perm-header-actions">
           <el-button size="small" @click="handleCheckAllMenus">全选</el-button>
           <el-button size="small" @click="handleClearAllMenus">清空</el-button>
         </div>
         <el-tree
           ref="menuTreeRef"
           :data="permMenuTree"
-          show-checkbox
+          :show-checkbox="!permReadOnly"
           node-key="id"
           default-expand-all
           :props="{ label: 'name', children: 'children' }"
@@ -223,7 +221,7 @@
         />
         <div class="perm-footer-actions">
           <el-button @click="permDrawerVisible = false">取消</el-button>
-          <el-button type="primary" :loading="permSaving" @click="handleSavePermissions">保存</el-button>
+          <el-button v-if="!permReadOnly" type="primary" :loading="permSaving" @click="handleSavePermissions">保存</el-button>
         </div>
       </div>
     </el-drawer>
@@ -233,8 +231,15 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Minus } from '@element-plus/icons-vue'
-import { getDepartments, createDepartment, updateDepartment, deleteDepartment } from '../api/department'
+import { Plus, Edit, Minus, Setting, Delete } from '@element-plus/icons-vue'
+import {
+  getDepartments,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+  getDepartmentMenuPermissions,
+  setDepartmentMenuPermissions
+} from '../api/department'
 import {
   getPositions,
   createPosition,
@@ -277,7 +282,9 @@ const positionForm = ref({ id: null, name: '', remark: '' })
 const permDrawerVisible = ref(false)
 const permLoading = ref(false)
 const permSaving = ref(false)
-const activePosition = ref({ id: null, name: '' })
+const permReadOnly = ref(false)
+const permDrawerTitle = ref('')
+const activePermissionTarget = ref({ type: 'position', id: null, name: '' })
 const permMenuTree = ref([])
 const menuTreeRef = ref()
 const permParentMap = ref({})
@@ -362,6 +369,7 @@ const fetchAllEmployees = async (params = {}) => {
   while (true) {
     const res = await getEmployees({
       ...params,
+      name_only: 1,
       page,
       page_size: pageSize
     })
@@ -490,11 +498,15 @@ const openEmployeeBindDrawer = async () => {
   employeeBindDrawerVisible.value = true
   employeeBindLoading.value = true
   try {
-    const list = await fetchAllEmployees()
+    const [list, related] = await Promise.all([
+      fetchAllEmployees(),
+      fetchAllEmployees({
+        department_id: departmentID,
+        position_id: roleID
+      })
+    ])
     employeeBindOptions.value = list
-    employeeBindSelectedIDs.value = list
-      .filter((item) => item.position_id === roleID && item.department_id === departmentID)
-      .map((item) => item.id)
+    employeeBindSelectedIDs.value = related.map((item) => item.id)
   } finally {
     employeeBindLoading.value = false
   }
@@ -686,7 +698,7 @@ const handlePositionSubmit = async () => {
 const handleRemoveRelation = async (row) => {
   if (!row.relation_id) return
   try {
-    await ElMessageBox.confirm(`确认移除角色「${row.name}」与当前部门的关系？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(`确认移除角色【${row.name}】与当前部门的关系？`, '提示', { type: 'warning' })
     await deleteDepartmentPosition(row.relation_id)
     ElMessage.success('关系移除成功')
     await loadDeptPositions(selectedDept.value)
@@ -700,7 +712,7 @@ const handleRemoveRelation = async (row) => {
 const handleDeletePosition = async (row) => {
   try {
     await ElMessageBox.confirm(
-      `确认删除角色「${row.name}」？删除后会清理该角色在全部部门的关联关系。`,
+      `确认删除角色【${row.name}】？删除后会清理该角色在全部部门中的关联关系。`,
       '高风险操作',
       { type: 'warning' }
     )
@@ -745,8 +757,26 @@ const includeParentMenuIDs = (keys = []) => {
   return Array.from(set)
 }
 
-const openPermDrawer = async (row) => {
-  activePosition.value = { id: row.id, name: row.name }
+const cloneMenuTreeWithDisabled = (nodes = [], disabled = false) => {
+  return (nodes || []).map((node) => ({
+    ...node,
+    disabled,
+    children: cloneMenuTreeWithDisabled(node.children || [], disabled)
+  }))
+}
+
+const openPermDrawer = async (row, options = {}) => {
+  const readOnly = options?.readOnly === true
+  const employeeName = options?.employeeName || ''
+  const targetType = options?.targetType || 'position'
+  const targetTypeText = targetType === 'department' ? '部门' : '菜单'
+
+  permReadOnly.value = readOnly
+  permDrawerTitle.value = employeeName
+    ? `${readOnly ? '权限查看' : '权限设置'} - ${employeeName}`
+    : `${readOnly ? `${targetTypeText}权限查看` : `${targetTypeText}权限设置`} - ${row.name || ''}`
+
+  activePermissionTarget.value = { type: targetType, id: row.id, name: row.name }
   permMenuTree.value = []
   permParentMap.value = {}
   allMenuIDs.value = []
@@ -754,9 +784,12 @@ const openPermDrawer = async (row) => {
   permLoading.value = true
 
   try {
-    const res = await getPositionMenuPermissions(row.id)
+    const res = targetType === 'department'
+      ? await getDepartmentMenuPermissions(row.id)
+      : await getPositionMenuPermissions(row.id)
     const data = res.data?.data || {}
-    permMenuTree.value = data.menu_tree || []
+    const menuTree = data.menu_tree || []
+    permMenuTree.value = readOnly ? cloneMenuTreeWithDisabled(menuTree, true) : menuTree
     buildPermParentMap(permMenuTree.value)
     allMenuIDs.value = collectMenuIDs(permMenuTree.value)
 
@@ -771,6 +804,17 @@ const openPermDrawer = async (row) => {
   }
 }
 
+const openDeptPermDrawer = async (dept) => {
+  if (!dept?.id) return
+  await openPermDrawer(dept, { targetType: 'department' })
+}
+
+
+const openEmployeePermEdit = async (employee) => {
+  if (!selectedRole.value?.id) return
+  await openPermDrawer(selectedRole.value, { readOnly: false, employeeName: employee?.name || '' })
+}
+
 const handleCheckAllMenus = () => {
   menuTreeRef.value?.setCheckedKeys(allMenuIDs.value)
 }
@@ -780,13 +824,17 @@ const handleClearAllMenus = () => {
 }
 
 const handleSavePermissions = async () => {
-  if (!activePosition.value.id) return
+  if (!activePermissionTarget.value.id) return
 
   permSaving.value = true
   try {
     const checkedKeys = menuTreeRef.value?.getCheckedKeys(false) || []
     const menuIDs = includeParentMenuIDs(checkedKeys)
-    await setPositionMenuPermissions(activePosition.value.id, { menu_ids: menuIDs })
+    if (activePermissionTarget.value.type === 'department') {
+      await setDepartmentMenuPermissions(activePermissionTarget.value.id, { menu_ids: menuIDs })
+    } else {
+      await setPositionMenuPermissions(activePermissionTarget.value.id, { menu_ids: menuIDs })
+    }
     ElMessage.success('权限保存成功')
     permDrawerVisible.value = false
   } catch (error) {
@@ -863,6 +911,31 @@ onMounted(async () => {
 }
 
 .dept-node-actions .el-button:hover {
+  background: var(--el-button-bg-color);
+  border-color: var(--el-button-border-color);
+}
+
+.role-row-actions,
+.employee-row-actions {
+  visibility: hidden;
+  display: inline-flex;
+  gap: 4px;
+}
+
+:deep(.el-table__row:hover) .role-row-actions,
+:deep(.el-table__row:hover) .employee-row-actions,
+:deep(.role-row-active) .role-row-actions {
+  visibility: visible;
+}
+
+.role-row-actions .el-button,
+.employee-row-actions .el-button {
+  background: transparent;
+  border-color: transparent;
+}
+
+.role-row-actions .el-button:hover,
+.employee-row-actions .el-button:hover {
   background: var(--el-button-bg-color);
   border-color: var(--el-button-border-color);
 }
@@ -989,3 +1062,4 @@ onMounted(async () => {
   gap: 8px;
 }
 </style>
+
