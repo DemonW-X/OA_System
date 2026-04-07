@@ -127,7 +127,6 @@
               :value="r.id"
             />
           </el-select>
-          <div style="color:#999;font-size:12px;margin-top:4px">仅显示状态可用的会议室</div>
         </el-form-item>
         <el-form-item label="参与人员">
           <el-select
