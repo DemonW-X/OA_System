@@ -1,6 +1,6 @@
 # OA System
 
-一个基于 **Go + Vue3** 的前后端分离 OA 办公系统，包含组织人事、公告、日程会议、审批流程、菜单管理、操作日志等功能。
+基于 **Go + Vue 3** 的前后端分离 OA 办公系统，覆盖组织人事、公告、会议与日程、审批流程、菜单权限、操作日志等核心场景。
 
 ---
 
@@ -8,21 +8,29 @@
 
 ```text
 oa-system/
-├─ backend/                 # Go 后端（Gin + GORM + MySQL + Redis）
+├─ backend/                      # Go 后端（Gin + GORM + MySQL + Redis）
 │  ├─ cmd/
-│  ├─ config/
-│  ├─ database/
-│  ├─ handlers/
-│  ├─ middleware/
-│  ├─ models/
-│  ├─ routes/
-│  ├─ uploads/
-│  ├─ .env
+│  ├─ config/                    # 配置加载
+│  ├─ database/                  # MySQL / Redis 初始化
+│  ├─ dto/                       # 请求/响应 DTO 定义
+│  ├─ handlers/                  # 业务处理层
+│  ├─ middleware/                # JWT 鉴权等中间件
+│  ├─ models/                    # GORM 数据模型
+│  ├─ routes/                    # 路由注册
+│  ├─ uploads/                   # 上传文件目录
+│  ├─ .env                       # 环境变量
+│  ├─ go.mod
 │  └─ main.go
-└─ frontend/                # Vue3 前端（Vite + Element Plus）
-   ├─ src/
-   ├─ package.json
-   └─ vite.config.js
+├─ frontend/                     # Vue 前端（Vite + Element Plus）
+│  ├─ src/
+│  │  ├─ api/                    # 接口封装
+│  │  ├─ router/                 # 前端路由
+│  │  ├─ views/                  # 页面视图
+│  │  ├─ styles/
+│  │  └─ utils/
+│  ├─ package.json
+│  └─ vite.config.js
+└─ README.md
 ```
 
 ---
@@ -31,17 +39,17 @@ oa-system/
 
 ### 后端
 - Go 1.22+
-- Gin
-- GORM
-- MySQL
-- Redis
+- Gin（HTTP 框架）
+- GORM + MySQL（ORM 与关系型数据库）
+- Redis（Token 校验、缓存相关能力）
 - JWT（登录鉴权）
 - Orchid（流程引擎）
+- Bluemonday（富文本安全清洗）
 
 ### 前端
 - Vue 3
-- Vite
-- Vue Router
+- Vite 5
+- Vue Router 4
 - Element Plus
 - Axios
 - WangEditor
@@ -51,24 +59,25 @@ oa-system/
 ## 3. 功能概览
 
 - 用户登录、个人信息、修改密码
-- 部门/职位/员工管理
-- 公告管理
-- 日历与会议室、事件预定
-- 请假、离职管理
-- 流程定义与审批（含待办）
-- 菜单管理（动态菜单）
-- 操作日志
-- 文件上传（图片/附件）
+- 组织与角色管理：部门、岗位（角色）、部门-岗位关联、员工管理
+- 公告管理（含审批流）
+- 日程与会议：日历事件、会议室、事件预定
+- 人事流程：入职、请假、离职（含提交、审批、撤回、取消审批）
+- 工作流管理：流程模板、业务类型、Orchid 流程定义与任务处理
+- 我的待办能力：待我审核、已审核、待阅、已阅
+- 菜单与权限：动态菜单、岗位菜单权限
+- 操作日志与异步日志写入
+- 文件上传：图片与附件
 
 ---
 
 ## 4. 环境要求
 
 - Go 1.22+
-- Node.js 18+
-- MySQL 8+
-- Redis 6+
-
+- Node.js `18+`
+- npm `9+`
+- MySQL `8+`
+- Redis `6+`
 ---
 
 ## 5. 后端启动
