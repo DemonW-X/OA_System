@@ -259,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Bell } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -322,6 +322,10 @@ const bizTypeMap = {
   event_booking: '事件预定'
 }
 
+const AUTO_REFRESH_INTERVAL = 5 * 60 * 1000
+let autoRefreshTimer = null
+const isAutoRefreshing = ref(false)
+
 const statusMap = {
   draft: '草稿',
   pending: '待审批',
@@ -354,6 +358,15 @@ const isAuthExpiredError = (error) => {
 const showErrorIfNeeded = (error, message) => {
   if (isAuthExpiredError(error)) return
   ElMessage.error(message)
+}
+
+const loadNoticeCard = async (silent = false) => {
+  try {
+    const res = await getNotices({ page: 1, page_size: 20, status: 1 })
+    noticeList.value = res.data?.data?.list || []
+  } catch (error) {
+    if (!silent) showErrorIfNeeded(error, '【公告栏】获取数据失败')
+  }
 }
 
 const openNotice = (item) => {
@@ -464,47 +477,67 @@ const reloadApprovals = async () => {
   await loadPending(pendingPage.value)
 }
 
-const loadPending = async (page = 1) => {
+const loadPending = async (page = 1, options = {}) => {
+  const { silent = false } = options
   pendingPage.value = page
   try {
     const res = await getMyPendingApprovals({ page, page_size: pageSize })
     pendingApprovals.value = res.data?.data?.list || res.data?.data || []
     pendingTotal.value = res.data?.data?.total || pendingApprovals.value.length
   } catch (error) {
-    showErrorIfNeeded(error, '【我的待审】获取数据失败')
+    if (!silent) showErrorIfNeeded(error, '【我的待审】获取数据失败')
   }
 }
 
-const loadApproved = async (page = 1) => {
+const loadApproved = async (page = 1, options = {}) => {
+  const { silent = false } = options
   approvedPage.value = page
   try {
     const res = await getMyApprovedApprovals({ page, page_size: pageSize })
     approvedList.value = res.data?.data?.list || res.data?.data || []
     approvedTotal.value = res.data?.total || res.data?.data?.total || approvedList.value.length
   } catch (error) {
-    showErrorIfNeeded(error, '【我的已审】获取数据失败')
+    if (!silent) showErrorIfNeeded(error, '【我的已审】获取数据失败')
   }
 }
 
-const loadPendingRead = async (page = 1) => {
+const loadPendingRead = async (page = 1, options = {}) => {
+  const { silent = false } = options
   pendingReadPage.value = page
   try {
     const res = await getMyPendingReads({ page, page_size: pageSize })
     pendingReadList.value = res.data?.data?.list || res.data?.data || []
     pendingReadTotal.value = res.data?.total || res.data?.data?.total || pendingReadList.value.length
   } catch (error) {
-    showErrorIfNeeded(error, '【我的待阅】获取数据失败')
+    if (!silent) showErrorIfNeeded(error, '【我的待阅】获取数据失败')
   }
 }
 
-const loadRead = async (page = 1) => {
+const loadRead = async (page = 1, options = {}) => {
+  const { silent = false } = options
   readPage.value = page
   try {
     const res = await getMyReadItems({ page, page_size: pageSize })
     readList.value = res.data?.data?.list || res.data?.data || []
     readTotal.value = res.data?.total || res.data?.data?.total || readList.value.length
   } catch (error) {
-    showErrorIfNeeded(error, '【我的已阅】获取数据失败')
+    if (!silent) showErrorIfNeeded(error, '【我的已阅】获取数据失败')
+  }
+}
+
+const refreshHomeCards = async (silent = true) => {
+  if (isAutoRefreshing.value) return
+  isAutoRefreshing.value = true
+  try {
+    await Promise.all([
+      loadNoticeCard(silent),
+      loadPending(pendingPage.value, { silent }),
+      loadApproved(approvedPage.value, { silent }),
+      loadPendingRead(pendingReadPage.value, { silent }),
+      loadRead(readPage.value, { silent })
+    ])
+  } finally {
+    isAutoRefreshing.value = false
   }
 }
 
@@ -607,32 +640,17 @@ const openAllNoticesDialog = async () => {
 
 onMounted(async () => {
   loadBizLabels()
+  await refreshHomeCards(false)
+  autoRefreshTimer = window.setInterval(() => {
+    refreshHomeCards(true)
+  }, AUTO_REFRESH_INTERVAL)
+})
 
-  const tasks = [
-    { key: 'noticesList', label: '公告栏', req: getNotices({ page: 1, page_size: 20, status: 1 }) },
-    { key: 'approvals', label: '待我审核', req: getMyPendingApprovals({ page: 1, page_size: pageSize }) }
-  ]
-
-  const results = await Promise.allSettled(tasks.map(t => t.req))
-
-  results.forEach((result, idx) => {
-    const task = tasks[idx]
-    if (result.status === 'rejected') {
-      showErrorIfNeeded(result.reason, `【${task.label}】获取数据失败`)
-      return
-    }
-
-    const data = result.value?.data?.data
-    switch (task.key) {
-      case 'noticesList':
-        noticeList.value = data?.list || []
-        break
-      case 'approvals':
-        pendingApprovals.value = data?.list || data || []
-        pendingTotal.value = data?.total || pendingApprovals.value.length
-        break
-    }
-  })
+onUnmounted(() => {
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
 })
 </script>
 
