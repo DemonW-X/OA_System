@@ -65,48 +65,191 @@
       @change="loadData"
     />
 
-    <el-dialog v-model="detailVisible" title="员工详情" width="520px">
-      <el-descriptions :column="1" border v-if="detailData">
-        <el-descriptions-item label="ID">{{ detailData.id }}</el-descriptions-item>
-        <el-descriptions-item label="姓名">{{ detailData.name }}</el-descriptions-item>
-        <el-descriptions-item label="电话">{{ detailData.phone || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ detailData.email || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="部门">{{ detailData.department?.name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="职位">{{ detailData.position_info?.name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ detailData.status === 1 ? '在职' : '离职' }}</el-descriptions-item>
-      </el-descriptions>
+    <el-dialog v-model="detailVisible" title="员工详情" width="760px">
+      <template v-if="detailData">
+        <el-divider content-position="left">基本信息</el-divider>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="ID">{{ detailData.id || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="姓名">{{ detailData.name || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ detailData.status === 1 ? '在职' : '离职' }}</el-descriptions-item>
+          <el-descriptions-item label="电话">{{ detailData.phone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="邮箱">{{ detailData.email || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="部门">{{ detailData.department?.name || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="职位">{{ detailData.position_info?.name || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="入职时间">{{ formatDate(detailData.onboard_date) }}</el-descriptions-item>
+          <el-descriptions-item label="入职类型">{{ onboardTypeLabel(detailData.onboard_type) }}</el-descriptions-item>
+          <el-descriptions-item label="试用天数">{{ detailData.probation_days ?? '-' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-divider content-position="left">个人信息</el-divider>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="试用截止日期">{{ formatDate(detailData.probation_end) }}</el-descriptions-item>
+          <el-descriptions-item label="身份证号">{{ detailData.id_card || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="籍贯">{{ detailData.native_place || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="现居地址">{{ detailData.address || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="紧急联系人">{{ detailData.emergency_name || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="紧急联系电话">{{ detailData.emergency_phone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="备注" :span="2">{{ detailData.remark || '-' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <el-divider content-position="left">教育与经历</el-divider>
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="学历">{{ educationLabel(detailData.education) }}</el-descriptions-item>
+          <el-descriptions-item label="工作年限">{{ detailData.work_years ?? 0 }} 年</el-descriptions-item>
+          <el-descriptions-item label="毕业院校">{{ detailData.school || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="专业">{{ detailData.major || '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </template>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="createVisible" title="新增员工" width="520px" @closed="resetCreateForm">
-      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="90px">
-        <el-form-item label="姓名" prop="name">
-          <el-input v-model="createForm.name" placeholder="请输入姓名" />
-        </el-form-item>
-        <el-form-item label="手机号" prop="phone">
-          <el-input v-model="createForm.phone" placeholder="请输入手机号" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="createForm.email" placeholder="请输入邮箱（选填）" />
-        </el-form-item>
-        <el-form-item label="部门">
-          <el-select v-model="createForm.department_id" placeholder="请选择部门" clearable style="width:100%">
-            <el-option v-for="d in departments" :key="d.id" :label="d.name" :value="d.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="职位">
-          <el-select v-model="createForm.position_id" placeholder="请选择职位" clearable style="width:100%">
-            <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-radio-group v-model="createForm.status">
-            <el-radio :value="1">在职</el-radio>
-            <el-radio :value="0">离职</el-radio>
-          </el-radio-group>
-        </el-form-item>
+    <el-dialog v-model="createVisible" title="新增员工" width="760px" @closed="resetCreateForm">
+      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="100px">
+        <el-divider content-position="left">基本信息</el-divider>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="姓名" prop="name">
+              <el-input v-model="createForm.name" placeholder="请输入姓名" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="状态">
+              <el-radio-group v-model="createForm.status">
+                <el-radio :value="1">在职</el-radio>
+                <el-radio :value="0">离职</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="电话" prop="phone">
+              <el-input v-model="createForm.phone" placeholder="请输入手机号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="邮箱" prop="email">
+              <el-input v-model="createForm.email" placeholder="请输入邮箱（选填）" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="部门">
+              <el-select v-model="createForm.department_id" placeholder="请选择部门" clearable style="width:100%">
+                <el-option v-for="d in departments" :key="d.id" :label="d.name" :value="d.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="职位">
+              <el-select v-model="createForm.position_id" placeholder="请选择职位" clearable style="width:100%">
+                <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="入职时间">
+              <el-date-picker
+                v-model="createForm.onboard_date"
+                type="date"
+                placeholder="请选择入职时间"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="入职类型">
+              <el-select v-model="createForm.onboard_type" style="width:100%">
+                <el-option label="新员工" value="new" />
+                <el-option label="返聘" value="rehire" />
+                <el-option label="调入" value="transfer" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="试用天数">
+              <el-input-number v-model="createForm.probation_days" :min="0" :max="365" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="试用截止日期">
+              <el-date-picker
+                v-model="createForm.probation_end"
+                type="date"
+                placeholder="请选择试用截止日期"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                style="width:100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-divider content-position="left">个人信息</el-divider>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="身份证号">
+              <el-input v-model="createForm.id_card" placeholder="请输入身份证号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="籍贯">
+              <el-input v-model="createForm.native_place" placeholder="请输入籍贯" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="现居地址">
+              <el-input v-model="createForm.address" placeholder="请输入现居地址" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="紧急联系人">
+              <el-input v-model="createForm.emergency_name" placeholder="请输入紧急联系人" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="紧急联系电话">
+              <el-input v-model="createForm.emergency_phone" placeholder="请输入紧急联系电话" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-divider content-position="left">教育与经历</el-divider>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="学历">
+              <el-select v-model="createForm.education" placeholder="请选择学历" clearable style="width:100%">
+                <el-option label="初中及以下" value="junior" />
+                <el-option label="高中/中专" value="high" />
+                <el-option label="大专" value="college" />
+                <el-option label="本科" value="bachelor" />
+                <el-option label="硕士" value="master" />
+                <el-option label="博士" value="doctor" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="工作年限">
+              <el-input-number v-model="createForm.work_years" :min="0" :max="50" style="width:100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="毕业院校">
+              <el-input v-model="createForm.school" placeholder="请输入毕业院校" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="专业">
+              <el-input v-model="createForm.major" placeholder="请输入专业" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="备注">
+              <el-input v-model="createForm.remark" type="textarea" :rows="2" placeholder="请输入备注（选填）" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
@@ -141,6 +284,20 @@ const defaultCreateForm = () => ({
   name: '',
   phone: '',
   email: '',
+  onboard_date: '',
+  onboard_type: 'new',
+  probation_days: 90,
+  probation_end: '',
+  id_card: '',
+  native_place: '',
+  address: '',
+  emergency_name: '',
+  emergency_phone: '',
+  education: '',
+  school: '',
+  major: '',
+  work_years: 0,
+  remark: '',
   department_id: null,
   position_id: null,
   status: 1
@@ -154,6 +311,26 @@ const createRules = {
 }
 
 const seqNo = (idx) => (query.value.page - 1) * query.value.page_size + idx + 1
+
+const formatDate = (value) => {
+  if (!value) return '-'
+  return String(value).slice(0, 10)
+}
+
+const onboardTypeLabel = (type) => ({
+  new: '新员工',
+  rehire: '返聘',
+  transfer: '调入'
+}[type] || type || '-')
+
+const educationLabel = (education) => ({
+  junior: '初中及以下',
+  high: '高中/中专',
+  college: '大专',
+  bachelor: '本科',
+  master: '硕士',
+  doctor: '博士'
+}[education] || (education || '-'))
 
 const loadData = async () => {
   const params = { ...query.value }
@@ -204,6 +381,8 @@ const handleCreate = async () => {
     createVisible.value = false
     query.value.page = 1
     await loadData()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || '新增失败')
   } finally {
     createLoading.value = false
   }

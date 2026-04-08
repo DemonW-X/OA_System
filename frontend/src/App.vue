@@ -142,7 +142,6 @@ const routeComponentMap = {
   '/event-booking':             () => import('./views/EventBooking.vue'),
   '/leave-request':             () => import('./views/LeaveRequest.vue'),
   '/resignation':               () => import('./views/Resignation.vue'),
-  '/onboarding':                () => import('./views/Onboarding.vue'),
   '/workflow':                  () => import('./views/Workflow.vue'),
   '/menu':                      () => import('./views/Menu.vue'),
   '/schedule':                  () => import('./views/Schedule.vue'),

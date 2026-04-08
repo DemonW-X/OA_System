@@ -6,6 +6,8 @@ import (
 	"oa-system/dto"
 	"oa-system/models"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -15,6 +17,18 @@ var (
 	phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
 	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 )
+
+func parseDateOnly(value string) (*time.Time, error) {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return nil, nil
+	}
+	t, err := time.ParseInLocation("2006-01-02", text, time.Local)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
 
 func validateEmployee(phone, email string) (string, bool) {
 	if phone != "" && !phoneRegex.MatchString(phone) {
@@ -118,7 +132,7 @@ func CreateEmployee(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "手机号不能为空，将作为登录账号"})
 		return
 	}
-	// 检查手机号是否已被注册为用户
+
 	var existCount int64
 	database.DB.Model(&models.User{}).Where("username = ?", req.Phone).Count(&existCount)
 	if existCount > 0 {
@@ -126,10 +140,19 @@ func CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	// 开启事务，保证员工和用户同时创建成功
+	onboardDate, err := parseDateOnly(req.OnboardDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "onboard_date 格式应为 YYYY-MM-DD"})
+		return
+	}
+	probationEnd, err := parseDateOnly(req.ProbationEnd)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "probation_end 格式应为 YYYY-MM-DD"})
+		return
+	}
+
 	tx := database.DB.Begin()
 
-	// 创建登录用户，默认密码 123456
 	hashed, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {
 		tx.Rollback()
@@ -148,15 +171,34 @@ func CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	// 创建员工，关联 UserID
 	emp := models.Employee{
-		Name:         req.Name,
-		Phone:        req.Phone,
-		Email:        req.Email,
-		DepartmentID: req.DepartmentID,
-		PositionID:   req.PositionID,
-		Status:       req.Status,
-		UserID:       user.ID,
+		Name:           req.Name,
+		Phone:          req.Phone,
+		Email:          req.Email,
+		OnboardDate:    onboardDate,
+		OnboardType:    req.OnboardType,
+		ProbationDays:  req.ProbationDays,
+		ProbationEnd:   probationEnd,
+		IDCard:         req.IDCard,
+		NativePlace:    req.NativePlace,
+		Address:        req.Address,
+		EmergencyName:  req.EmergencyName,
+		EmergencyPhone: req.EmergencyPhone,
+		Education:      req.Education,
+		School:         req.School,
+		Major:          req.Major,
+		WorkYears:      req.WorkYears,
+		Remark:         req.Remark,
+		DepartmentID:   req.DepartmentID,
+		PositionID:     req.PositionID,
+		Status:         req.Status,
+		UserID:         user.ID,
+	}
+	if emp.OnboardType == "" {
+		emp.OnboardType = "new"
+	}
+	if emp.ProbationDays <= 0 {
+		emp.ProbationDays = 90
 	}
 	if emp.Status == 0 {
 		emp.Status = 1
@@ -167,7 +209,10 @@ func CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交事务失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": emp})
 	writeLog(c, "员工管理", "新增", "新增员工："+req.Name)
 }
@@ -192,9 +237,19 @@ func UpdateEmployee(c *gin.Context) {
 		return
 	}
 
+	onboardDate, err := parseDateOnly(req.OnboardDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "onboard_date 格式应为 YYYY-MM-DD"})
+		return
+	}
+	probationEnd, err := parseDateOnly(req.ProbationEnd)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "probation_end 格式应为 YYYY-MM-DD"})
+		return
+	}
+
 	tx := database.DB.Begin()
 
-	// 同步更新关联用户的真实姓名
 	if emp.UserID > 0 {
 		if err := tx.Model(&models.User{}).Where("id = ?", emp.UserID).
 			Update("real_name", req.Name).Error; err != nil {
@@ -207,16 +262,39 @@ func UpdateEmployee(c *gin.Context) {
 	emp.Name = req.Name
 	emp.Phone = req.Phone
 	emp.Email = req.Email
+	emp.OnboardDate = onboardDate
+	emp.OnboardType = req.OnboardType
+	emp.ProbationDays = req.ProbationDays
+	emp.ProbationEnd = probationEnd
+	emp.IDCard = req.IDCard
+	emp.NativePlace = req.NativePlace
+	emp.Address = req.Address
+	emp.EmergencyName = req.EmergencyName
+	emp.EmergencyPhone = req.EmergencyPhone
+	emp.Education = req.Education
+	emp.School = req.School
+	emp.Major = req.Major
+	emp.WorkYears = req.WorkYears
+	emp.Remark = req.Remark
 	emp.DepartmentID = req.DepartmentID
 	emp.PositionID = req.PositionID
 	emp.Status = req.Status
+	if emp.OnboardType == "" {
+		emp.OnboardType = "new"
+	}
+	if emp.ProbationDays <= 0 {
+		emp.ProbationDays = 90
+	}
 	if err := tx.Save(&emp).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败"})
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交事务失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": emp})
 	writeLog(c, "员工管理", "修改", "修改员工："+req.Name)
 }
@@ -234,7 +312,6 @@ func DeleteEmployee(c *gin.Context) {
 
 	tx := database.DB.Begin()
 
-	// 同步删除关联的登录用户
 	if emp.UserID > 0 {
 		if err := tx.Delete(&models.User{}, emp.UserID).Error; err != nil {
 			tx.Rollback()
@@ -249,7 +326,10 @@ func DeleteEmployee(c *gin.Context) {
 		return
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交事务失败"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
 	writeLog(c, "员工管理", "删除", "删除员工："+emp.Name)
 }
