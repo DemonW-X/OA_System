@@ -14,6 +14,9 @@
         <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
       </el-form-item>
+      <el-form-item style="margin-left:auto;margin-right:0">
+        <el-button type="primary" @click="openDialog()">新增会议室</el-button>
+      </el-form-item>
     </el-form>
 
     <el-table :data="list" stripe>

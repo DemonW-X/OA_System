@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-card shadow="never" style="border:none">
     <el-form :inline="true" style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap">
       <el-form-item label="姓名">
@@ -18,6 +18,9 @@
       <el-form-item>
         <el-button type="primary" @click="handleSearch">搜索</el-button>
         <el-button @click="handleReset">重置</el-button>
+      </el-form-item>
+      <el-form-item style="margin-left:auto;margin-right:0">
+        <el-button type="primary" @click="openCreateDialog">新增员工</el-button>
       </el-form-item>
     </el-form>
 
@@ -62,7 +65,6 @@
       @change="loadData"
     />
 
-    <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" title="员工详情" width="520px">
       <el-descriptions :column="1" border v-if="detailData">
         <el-descriptions-item label="ID">{{ detailData.id }}</el-descriptions-item>
@@ -72,10 +74,43 @@
         <el-descriptions-item label="部门">{{ detailData.department?.name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="职位">{{ detailData.position_info?.name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ detailData.status === 1 ? '在职' : '离职' }}</el-descriptions-item>
-
       </el-descriptions>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="createVisible" title="新增员工" width="520px" @closed="resetCreateForm">
+      <el-form :model="createForm" :rules="createRules" ref="createFormRef" label-width="90px">
+        <el-form-item label="姓名" prop="name">
+          <el-input v-model="createForm.name" placeholder="请输入姓名" />
+        </el-form-item>
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="createForm.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="createForm.email" placeholder="请输入邮箱（选填）" />
+        </el-form-item>
+        <el-form-item label="部门">
+          <el-select v-model="createForm.department_id" placeholder="请选择部门" clearable style="width:100%">
+            <el-option v-for="d in departments" :key="d.id" :label="d.name" :value="d.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="职位">
+          <el-select v-model="createForm.position_id" placeholder="请选择职位" clearable style="width:100%">
+            <el-option v-for="p in positions" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="createForm.status">
+            <el-radio :value="1">在职</el-radio>
+            <el-radio :value="0">离职</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createLoading" @click="handleCreate">确定</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -83,27 +118,57 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getEmployees, getEmployee } from '../api/employee'
+import { ElMessage } from 'element-plus'
+import { getEmployees, getEmployee, createEmployee } from '../api/employee'
 import { getDepartments } from '../api/department'
+import { getPositions } from '../api/position'
 
 const list = ref([])
 const total = ref(0)
 const departments = ref([])
+const positions = ref([])
+
 const detailVisible = ref(false)
 const detailData = ref(null)
+
+const createVisible = ref(false)
+const createFormRef = ref()
+const createLoading = ref(false)
+
 const query = ref({ name: '', department_id: null, status: null, page: 1, page_size: 10 })
 
-const approveStatusLabel = (s) => ({ draft: '草稿', pending: '待审批', approved: '已通过', rejected: '已拒绝' }[s] || '待审批')
-const approveTagType = (s) => ({ draft: 'info', pending: 'warning', approved: 'success', rejected: 'danger' }[s] || 'warning')
+const defaultCreateForm = () => ({
+  name: '',
+  phone: '',
+  email: '',
+  department_id: null,
+  position_id: null,
+  status: 1
+})
+const createForm = ref(defaultCreateForm())
+
+const createRules = {
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
+  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }]
+}
+
 const seqNo = (idx) => (query.value.page - 1) * query.value.page_size + idx + 1
 
 const loadData = async () => {
-  const res = await getEmployees(query.value)
-  list.value = res.data.data.list || []
-  total.value = res.data.data.total || 0
+  const params = { ...query.value }
+  if (!params.department_id) delete params.department_id
+  if (params.status === null || params.status === undefined || params.status === '') delete params.status
+  const res = await getEmployees(params)
+  list.value = res.data?.data?.list || []
+  total.value = res.data?.data?.total || 0
 }
 
-const handleSearch = () => { query.value.page = 1; loadData() }
+const handleSearch = () => {
+  query.value.page = 1
+  loadData()
+}
+
 const handleReset = () => {
   query.value = { name: '', department_id: null, status: null, page: 1, page_size: 10 }
   loadData()
@@ -111,13 +176,46 @@ const handleReset = () => {
 
 const openDetail = async (id) => {
   const res = await getEmployee(id)
-  detailData.value = res.data.data
+  detailData.value = res.data?.data || null
   detailVisible.value = true
 }
 
+const openCreateDialog = () => {
+  createForm.value = defaultCreateForm()
+  createVisible.value = true
+}
+
+const resetCreateForm = () => {
+  createFormRef.value?.clearValidate()
+  createForm.value = defaultCreateForm()
+}
+
+const handleCreate = async () => {
+  await createFormRef.value.validate()
+  createLoading.value = true
+  try {
+    const payload = {
+      ...createForm.value,
+      department_id: createForm.value.department_id || 0,
+      position_id: createForm.value.position_id || 0
+    }
+    await createEmployee(payload)
+    ElMessage.success('新增成功')
+    createVisible.value = false
+    query.value.page = 1
+    await loadData()
+  } finally {
+    createLoading.value = false
+  }
+}
+
 onMounted(async () => {
-  const deptRes = await getDepartments({ page: 1, page_size: 100 })
-  departments.value = deptRes.data.data.list || []
+  const [deptRes, posRes] = await Promise.all([
+    getDepartments({ page: 1, page_size: 1000 }),
+    getPositions({ page: 1, page_size: 1000 })
+  ])
+  departments.value = deptRes.data?.data?.list || []
+  positions.value = posRes.data?.data?.list || []
   loadData()
 })
 </script>
