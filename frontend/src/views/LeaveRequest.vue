@@ -179,7 +179,7 @@ import { getEmployees } from '../api/employee'
 import { getOrchidWorkflowHistories, transferOrchidWorkflowTask, skipOrchidWorkflowNode } from '../api/orchid_workflow'
 
 const leaveTypes = [
-  { value: 'annual',   label: '年假',   tag: ''        },
+  { value: 'annual',   label: '年假',   tag: 'primary' },
   { value: 'sick',     label: '病假',   tag: 'warning' },
   { value: 'personal', label: '事假',   tag: 'info'    },
   { value: 'other',    label: '其他',   tag: 'info'    },
@@ -191,9 +191,9 @@ const statusOptions = [
   { value: 'rejected', label: '已拒绝', tag: 'danger'  },
 ]
 const getLeaveTypeLabel = (v) => leaveTypes.find(t => t.value === v)?.label || v
-const getLeaveTypeTag   = (v) => leaveTypes.find(t => t.value === v)?.tag  || ''
+const getLeaveTypeTag   = (v) => leaveTypes.find(t => t.value === v)?.tag  || 'info'
 const getStatusLabel    = (v) => statusOptions.find(s => s.value === v)?.label || v
-const getStatusTag      = (v) => statusOptions.find(s => s.value === v)?.tag   || ''
+const getStatusTag      = (v) => statusOptions.find(s => s.value === v)?.tag   || 'info'
 const formatDate = (t) => t ? t.slice(0, 10) : ''
 
 const list = ref([])

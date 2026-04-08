@@ -745,6 +745,21 @@ const collectMenuIDs = (nodes = []) => {
   return ids
 }
 
+const collectLeafMenuIDs = (nodes = []) => {
+  const ids = []
+  const walk = (arr) => {
+    for (const node of arr) {
+      if (node.children?.length) {
+        walk(node.children)
+      } else {
+        ids.push(node.id)
+      }
+    }
+  }
+  walk(nodes)
+  return ids
+}
+
 const includeParentMenuIDs = (keys = []) => {
   const set = new Set(keys)
   for (const id of keys) {
@@ -794,8 +809,10 @@ const openPermDrawer = async (row, options = {}) => {
     allMenuIDs.value = collectMenuIDs(permMenuTree.value)
 
     const checkedIDs = data.checked_menu_ids || []
+    const leafIDSet = new Set(collectLeafMenuIDs(permMenuTree.value))
+    const checkedLeafIDs = checkedIDs.filter((id) => leafIDSet.has(id))
     await nextTick()
-    menuTreeRef.value?.setCheckedKeys(includeParentMenuIDs(checkedIDs))
+    menuTreeRef.value?.setCheckedKeys(checkedLeafIDs)
   } catch (error) {
     permDrawerVisible.value = false
     ElMessage.error(extractErrorMessage(error, '加载权限失败'))

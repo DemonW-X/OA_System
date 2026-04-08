@@ -81,7 +81,7 @@ const query = ref({
 
 const actionTagType = (action) => {
   const map = { '新增': 'success', '修改': 'warning', '删除': 'danger', '查询': 'info' }
-  return map[action] || ''
+  return map[action] || 'info'
 }
 
 const formatDate = (dateStr) => {

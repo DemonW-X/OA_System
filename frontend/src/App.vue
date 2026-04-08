@@ -273,9 +273,18 @@ const toggleAside = () => {
   isCollapsed.value = !isCollapsed.value
 }
 
-const userInfo = computed(() => {
-  try { return JSON.parse(localStorage.getItem('userInfo') || '{}') } catch { return {} }
-})
+const parseUserInfo = () => {
+  try {
+    return JSON.parse(localStorage.getItem('userInfo') || '{}')
+  } catch {
+    return {}
+  }
+}
+
+const userInfo = ref(parseUserInfo())
+const syncUserInfo = () => {
+  userInfo.value = parseUserInfo()
+}
 
 // 弹窗状态
 const settingsVisible = ref(false)
@@ -362,7 +371,9 @@ const handleSaveProfile = async () => {
   try {
     const res = await updateProfile(profileForm.value)
     const { username, real_name } = res.data.data
-    localStorage.setItem('userInfo', JSON.stringify({ ...userInfo.value, username, real_name }))
+    const nextUserInfo = { ...userInfo.value, username, real_name }
+    localStorage.setItem('userInfo', JSON.stringify(nextUserInfo))
+    userInfo.value = nextUserInfo
     ElMessage.success('保存成功')
     settingsVisible.value = false
   } finally {
@@ -382,6 +393,7 @@ const handleChangePassword = async () => {
     settingsVisible.value = false
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
+    userInfo.value = {}
     router.push('/login')
   } catch {
     refreshCaptcha()
@@ -398,11 +410,13 @@ const handleCommand = async (cmd) => {
     await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
     localStorage.removeItem('token')
     localStorage.removeItem('userInfo')
+    userInfo.value = {}
     router.push('/login')
   }
 }
 
 onMounted(() => {
+  syncUserInfo()
   if (route.path !== '/login') {
     loadMenus()
     // 恢复所有已保存的页签组件
@@ -411,6 +425,7 @@ onMounted(() => {
 })
 
 watch(() => route.path, (newPath, oldPath) => {
+  syncUserInfo()
   if (oldPath === '/login' && newPath !== '/login') loadMenus()
 })
 </script>

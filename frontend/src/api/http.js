@@ -12,7 +12,8 @@ const http = axios.create({
 // 请求拦截：自动带上 token
 http.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
-  if (token) {
+  const isLoginRequest = typeof config.url === 'string' && config.url.includes('/login')
+  if (token && !isLoginRequest) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
