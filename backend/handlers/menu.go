@@ -78,19 +78,16 @@ func GetMenus(c *gin.Context) {
 	useCache := kw == "" && c.DefaultQuery("tree", "1") == "1"
 
 	if useCache {
-		employeeID, needFilter := resolveMenuFilterEmployeeID(c)
-		if needFilter && employeeID <= 0 {
-			c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
-			return
-		}
-		if cached := getMenuTreeCache(employeeID); cached != nil {
+		permCtx := resolveMenuPermissionContext(c)
+		cacheToken := permCtx.cacheToken()
+		if cached := getMenuTreeCache(cacheToken); cached != nil {
 			c.JSON(http.StatusOK, gin.H{"code": 0, "data": cached})
 			return
 		}
 		var list []models.Menu
 		query := database.DB.Model(&models.Menu{})
-		if needFilter {
-			ids := getEmployeeAssignedMenuIDs(employeeID)
+		if permCtx.needFilter() {
+			ids := getMenuIDsByContext(permCtx)
 			if len(ids) == 0 {
 				c.JSON(http.StatusOK, gin.H{"code": 0, "data": []MenuTreeItem{}})
 				return
@@ -99,7 +96,7 @@ func GetMenus(c *gin.Context) {
 		}
 		query.Order("sort_code asc, id asc").Find(&list)
 		tree := buildMenuTree(list)
-		setMenuTreeCache(employeeID, tree)
+		setMenuTreeCache(cacheToken, tree)
 		c.JSON(http.StatusOK, gin.H{"code": 0, "data": tree})
 		return
 	}
