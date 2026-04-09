@@ -13,7 +13,7 @@ type Employee struct {
 	Email          string         `json:"email"`
 	OnboardDate    *time.Time     `json:"onboard_date"`
 	OnboardType    string         `json:"onboard_type" gorm:"default:'new'"`
-	ProbationDays  int            `json:"probation_days" gorm:"default:90"`
+	ProbationDays  int            `json:"probation_days" gorm:"default:3"`
 	ProbationEnd   *time.Time     `json:"probation_end"`
 	IDCard         string         `json:"id_card"`
 	NativePlace    string         `json:"native_place"`

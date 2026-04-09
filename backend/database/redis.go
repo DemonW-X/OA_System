@@ -10,6 +10,7 @@ import (
 
 var RDB *redis.Client
 
+// InitRedis 初始化相关资源
 func InitRedis() {
 	RDB = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), os.Getenv("REDIS_PORT")),

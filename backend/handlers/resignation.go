@@ -13,6 +13,7 @@ import (
 type ResignationRequest = dto.ResignationRequestDTO
 type ResignationApproveReq = dto.ResignationApproveRequestDTO
 
+// GetResignations 获取数据
 func GetResignations(c *gin.Context) {
 	var list []models.Resignation
 	query := database.DB.Model(&models.Resignation{}).Preload("Employee").Preload("Employee.Department").Preload("Employee.PositionInfo")
@@ -39,6 +40,7 @@ func GetResignations(c *gin.Context) {
 	writeLog(c, "离职管理", "查询", "查询离职列表")
 }
 
+// GetResignation 获取数据
 func GetResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -52,6 +54,7 @@ func GetResignation(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": item})
 }
 
+// CreateResignation 创建数据
 func CreateResignation(c *gin.Context) {
 	var req ResignationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -86,6 +89,7 @@ func CreateResignation(c *gin.Context) {
 	writeLog(c, "离职管理", "新增", "新增离职记录")
 }
 
+// UpdateResignation 更新数据
 func UpdateResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -132,6 +136,7 @@ func UpdateResignation(c *gin.Context) {
 	writeLog(c, "离职管理", "修改", "修改离职记录")
 }
 
+// SubmitResignation 提交业务处理
 func SubmitResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -178,6 +183,7 @@ func SubmitResignation(c *gin.Context) {
 	writeLog(c, "离职管理", "提交", "提交离职审核")
 }
 
+// ApproveResignation 处理审批业务
 func ApproveResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -234,6 +240,7 @@ func ApproveResignation(c *gin.Context) {
 	writeLog(c, "离职管理", "审批", "审批离职记录")
 }
 
+// WithdrawResignation 执行撤回处理
 func WithdrawResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -277,6 +284,7 @@ func WithdrawResignation(c *gin.Context) {
 	writeLog(c, "离职管理", "撤回", "撤回离职审核")
 }
 
+// CancelApproveResignation 执行取消处理
 func CancelApproveResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -313,6 +321,7 @@ func CancelApproveResignation(c *gin.Context) {
 	writeLog(c, "离职管理", "取消审核", "取消离职审核")
 }
 
+// DeleteResignation 删除数据
 func DeleteResignation(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

@@ -27,6 +27,7 @@ var allowedFileTypes = map[string]bool{
 const maxImageSize = 5 << 20 // 5MB
 const maxFileSize = 20 << 20 // 20MB
 
+// UploadImage 执行相关业务逻辑
 func UploadImage(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -54,6 +55,7 @@ func UploadImage(c *gin.Context) {
 	})
 }
 
+// UploadAttachment 执行相关业务逻辑
 func UploadAttachment(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -80,6 +82,7 @@ func UploadAttachment(c *gin.Context) {
 	})
 }
 
+// saveUploadedFile 保存业务数据
 func saveUploadedFile(c *gin.Context, file *multipart.FileHeader, subDir string) (string, error) {
 	dir := filepath.Join(uploadDir, subDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {

@@ -15,11 +15,13 @@ import (
 type OrchidWorkflowDefinitionReq = dto.OrchidWorkflowDefinitionRequestDTO
 type TransferOrSkipReq = dto.OrchidTransferOrSkipRequestDTO
 
+// validateOrchidDag 校验输入或状态
 func validateOrchidDag(name, dagJSON string) error {
 	wf := orchid.NewWorkflow(name)
 	return wf.Import([]byte(dagJSON))
 }
 
+// GetOrchidWorkflowDefinition 获取数据
 func GetOrchidWorkflowDefinition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -33,6 +35,7 @@ func GetOrchidWorkflowDefinition(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": def})
 }
 
+// GetOrchidWorkflowDefinitions 获取数据
 func GetOrchidWorkflowDefinitions(c *gin.Context) {
 	var list []models.OrchidWorkflowDefinition
 	query := database.DB.Model(&models.OrchidWorkflowDefinition{})
@@ -43,6 +46,7 @@ func GetOrchidWorkflowDefinitions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list})
 }
 
+// CreateOrchidWorkflowDefinition 创建数据
 func CreateOrchidWorkflowDefinition(c *gin.Context) {
 	var req OrchidWorkflowDefinitionReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -71,6 +75,7 @@ func CreateOrchidWorkflowDefinition(c *gin.Context) {
 	writeLog(c, "流程引擎", "新增", "新增Orchid流程定义："+req.Name)
 }
 
+// UpdateOrchidWorkflowDefinition 更新数据
 func UpdateOrchidWorkflowDefinition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -103,6 +108,7 @@ func UpdateOrchidWorkflowDefinition(c *gin.Context) {
 	writeLog(c, "流程引擎", "修改", "修改Orchid流程定义："+def.Name)
 }
 
+// DeleteOrchidWorkflowDefinition 删除数据
 func DeleteOrchidWorkflowDefinition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -121,6 +127,7 @@ func DeleteOrchidWorkflowDefinition(c *gin.Context) {
 	writeLog(c, "流程引擎", "删除", "删除Orchid流程定义："+def.Name)
 }
 
+// GetOrchidWorkflowHistories 获取数据
 func GetOrchidWorkflowHistories(c *gin.Context) {
 	bizType := c.Query("biz_type")
 	bizID := c.Query("biz_id")
@@ -188,6 +195,7 @@ func GetOrchidWorkflowHistories(c *gin.Context) {
 
 type PendingApprovalItem = dto.OrchidPendingApprovalItemDTO
 
+// buildApprovalTitle 构建业务数据
 func buildApprovalTitle(ins models.OrchidWorkflowInstance) string {
 	switch ins.BizType {
 	case "employee":
@@ -225,6 +233,7 @@ func buildApprovalTitle(ins models.OrchidWorkflowInstance) string {
 	return fmt.Sprintf("%s #%d", ins.BizType, ins.BizID)
 }
 
+// buildApprovalDetailPath 构建业务数据
 func buildApprovalDetailPath(bizType string, bizID int) string {
 	switch bizType {
 	case "employee":
@@ -242,6 +251,7 @@ func buildApprovalDetailPath(bizType string, bizID int) string {
 	}
 }
 
+// GetMyPendingApprovals 获取数据
 func GetMyPendingApprovals(c *gin.Context) {
 	userID := c.GetInt("userID")
 	if userID <= 0 {
@@ -507,6 +517,7 @@ func GetMyReadItems(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": gin.H{"list": items, "total": total}})
 }
 
+// TransferOrchidWorkflowTask 执行相关业务逻辑
 func TransferOrchidWorkflowTask(c *gin.Context) {
 	bizType := c.Query("biz_type")
 	bizID := atoiDefault(c.Query("biz_id"), 0)
@@ -530,6 +541,7 @@ func TransferOrchidWorkflowTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "转交成功"})
 }
 
+// SkipOrchidWorkflowNode 执行相关业务逻辑
 func SkipOrchidWorkflowNode(c *gin.Context) {
 	bizType := c.Query("biz_type")
 	bizID := atoiDefault(c.Query("biz_id"), 0)
@@ -550,6 +562,7 @@ func SkipOrchidWorkflowNode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "已跳过"})
 }
 
+// SeedOrchidWorkflowTemplates 执行相关业务逻辑
 func SeedOrchidWorkflowTemplates(c *gin.Context) {
 	templates := []OrchidWorkflowDefinitionReq{
 		{
@@ -598,6 +611,7 @@ func SeedOrchidWorkflowTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "导入完成", "data": gin.H{"created": created}})
 }
 
+// atoiDefault 执行相关业务逻辑
 func atoiDefault(s string, d int) int {
 	n, err := strconv.Atoi(s)
 	if err != nil {

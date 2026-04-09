@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// meetingRoomRoutes 执行相关业务逻辑
 func meetingRoomRoutes(rg *gin.RouterGroup) {
 	rg.GET("/meeting-rooms", handlers.GetMeetingRooms)
 	rg.POST("/meeting-rooms", handlers.CreateMeetingRoom)

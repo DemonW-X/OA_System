@@ -14,6 +14,7 @@ import (
 type MenuRequest = dto.MenuRequestDTO
 type MenuTreeItem = dto.MenuTreeItemDTO
 
+// buildMenuTree 构建业务数据
 func buildMenuTree(list []models.Menu) []MenuTreeItem {
 	// 预加载所有审批流配置，避免 N+1
 	var configs []models.MenuWorkflowConfig
@@ -73,6 +74,7 @@ func buildMenuTree(list []models.Menu) []MenuTreeItem {
 	return build(0)
 }
 
+// GetMenus 获取数据
 func GetMenus(c *gin.Context) {
 	kw := strings.TrimSpace(c.Query("keyword"))
 	useCache := kw == "" && c.DefaultQuery("tree", "1") == "1"
@@ -126,6 +128,7 @@ func GetMenus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": list})
 }
 
+// GetMenu 获取数据
 func GetMenu(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -139,6 +142,7 @@ func GetMenu(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 }
 
+// CreateMenu 创建数据
 func CreateMenu(c *gin.Context) {
 	var req MenuRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -176,6 +180,7 @@ func CreateMenu(c *gin.Context) {
 	writeLog(c, "菜单管理", "新增", "新增菜单："+req.Name)
 }
 
+// UpdateMenu 更新数据
 func UpdateMenu(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -223,6 +228,7 @@ func UpdateMenu(c *gin.Context) {
 	writeLog(c, "菜单管理", "修改", "修改菜单："+req.Name)
 }
 
+// DeleteMenu 删除数据
 func DeleteMenu(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

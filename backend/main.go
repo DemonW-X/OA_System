@@ -8,6 +8,7 @@ import (
 	"oa-system/routes"
 )
 
+// main 程序入口
 func main() {
 	config.Init()
 	database.InitDB()

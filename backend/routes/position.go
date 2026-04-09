@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// positionRoutes 执行相关业务逻辑
 func positionRoutes(rg *gin.RouterGroup) {
 	rg.GET("/positions", handlers.GetPositions)
 	rg.GET("/positions/:id", handlers.GetPosition)

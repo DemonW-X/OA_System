@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetLogs 获取数据
 func GetLogs(c *gin.Context) {
 	var list []models.OperationLog
 	query := database.DB.Model(&models.OperationLog{})
@@ -40,6 +41,7 @@ func GetLogs(c *gin.Context) {
 	})
 }
 
+// GetLogModules 获取数据
 func GetLogModules(c *gin.Context) {
 	var modules []string
 	database.DB.Model(&models.OperationLog{}).

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// departmentRoutes 执行相关业务逻辑
 func departmentRoutes(rg *gin.RouterGroup) {
 	rg.GET("/departments", handlers.GetDepartments)
 	rg.POST("/departments", handlers.CreateDepartment)

@@ -18,6 +18,7 @@ func Query() *gorm.DB {
 	return DB.Where("deleted_at IS NULL")
 }
 
+// InitDB 初始化相关资源
 func InitDB() {
 	cfg := config.AppConfig
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",

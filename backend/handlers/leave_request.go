@@ -15,6 +15,7 @@ const dateLayout = "2006-01-02"
 
 type flowLogEntry = dto.LeaveFlowLogEntryDTO
 
+// appendFlowLog 执行相关业务逻辑
 func appendFlowLog(raw string, entry flowLogEntry) string {
 	logs := []flowLogEntry{}
 	if raw != "" {
@@ -25,6 +26,7 @@ func appendFlowLog(raw string, entry flowLogEntry) string {
 	return string(b)
 }
 
+// currentOperator 执行相关业务逻辑
 func currentOperator(c *gin.Context) string {
 	op := c.GetString("realName")
 	if op == "" {
@@ -33,6 +35,7 @@ func currentOperator(c *gin.Context) string {
 	return op
 }
 
+// GetLeaveRequests 获取数据
 func GetLeaveRequests(c *gin.Context) {
 	var list []models.LeaveRequest
 	query := database.DB.Model(&models.LeaveRequest{}).Preload("Employee")
@@ -59,6 +62,7 @@ func GetLeaveRequests(c *gin.Context) {
 	writeLog(c, "请假管理", "查询", "查询请假列表")
 }
 
+// GetLeaveRequest 获取数据
 func GetLeaveRequest(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -72,6 +76,7 @@ func GetLeaveRequest(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": leave})
 }
 
+// CreateLeaveRequest 创建数据
 func CreateLeaveRequest(c *gin.Context) {
 	var req dto.LeaveRequestCreateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -110,6 +115,7 @@ func CreateLeaveRequest(c *gin.Context) {
 	writeLog(c, "请假管理", "新增", "新增请假申请")
 }
 
+// UpdateLeaveRequest 更新数据
 func UpdateLeaveRequest(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -157,6 +163,7 @@ func UpdateLeaveRequest(c *gin.Context) {
 	writeLog(c, "请假管理", "修改", "修改请假申请")
 }
 
+// SubmitLeaveRequest 提交业务处理
 func SubmitLeaveRequest(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -193,6 +200,7 @@ func SubmitLeaveRequest(c *gin.Context) {
 	writeLog(c, "请假管理", "提交", "提交请假申请")
 }
 
+// ApproveLeaveRequest 处理审批业务
 func ApproveLeaveRequest(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -239,6 +247,7 @@ func ApproveLeaveRequest(c *gin.Context) {
 	writeLog(c, "请假管理", "审批", action)
 }
 
+// DeleteLeaveRequest 删除数据
 func DeleteLeaveRequest(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// eventBookingRoutes 执行相关业务逻辑
 func eventBookingRoutes(rg *gin.RouterGroup) {
 	rg.GET("/event-bookings", handlers.GetEventBookings)
 	rg.GET("/event-bookings/:id", handlers.GetEventBooking)

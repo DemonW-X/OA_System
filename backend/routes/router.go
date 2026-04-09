@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SetupRouter 配置并初始化服务
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 

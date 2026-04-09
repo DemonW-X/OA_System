@@ -12,6 +12,7 @@ import (
 
 type DepartmentMenuPermissionRequest = dto.PositionMenuPermissionRequestDTO
 
+// GetDepartmentMenuPermissions 获取数据
 func GetDepartmentMenuPermissions(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "No permission"})
@@ -47,6 +48,7 @@ func GetDepartmentMenuPermissions(c *gin.Context) {
 	}})
 }
 
+// SetDepartmentMenuPermissions 更新数据
 func SetDepartmentMenuPermissions(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "No permission"})

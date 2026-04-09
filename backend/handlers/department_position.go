@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// GetDepartmentPositions 获取数据
 func GetDepartmentPositions(c *gin.Context) {
 	var list []models.DepartmentPosition
 	query := database.DB.Model(&models.DepartmentPosition{}).
@@ -57,6 +58,7 @@ func GetDepartmentPositions(c *gin.Context) {
 	writeLog(c, "角色管理", "查询", "查询部门-职位关系列表")
 }
 
+// CreateDepartmentPosition 创建数据
 func CreateDepartmentPosition(c *gin.Context) {
 	var req dto.DepartmentPositionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -122,6 +124,7 @@ func CreateDepartmentPosition(c *gin.Context) {
 	writeLog(c, "角色管理", "新增", "新增部门-职位关系")
 }
 
+// DeleteDepartmentPosition 删除数据
 func DeleteDepartmentPosition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

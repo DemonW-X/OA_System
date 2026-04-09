@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetMeetingRooms 获取数据
 func GetMeetingRooms(c *gin.Context) {
 	var list []models.MeetingRoom
 	query := database.DB.Model(&models.MeetingRoom{})
@@ -29,6 +30,7 @@ func GetMeetingRooms(c *gin.Context) {
 	writeLog(c, "会议室管理", "查询", "查询会议室列表")
 }
 
+// CreateMeetingRoom 创建数据
 func CreateMeetingRoom(c *gin.Context) {
 	var req dto.MeetingRoomRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,6 +59,7 @@ func CreateMeetingRoom(c *gin.Context) {
 	writeLog(c, "会议室管理", "新增", "新增会议室："+req.Name)
 }
 
+// UpdateMeetingRoom 更新数据
 func UpdateMeetingRoom(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -91,6 +94,7 @@ func UpdateMeetingRoom(c *gin.Context) {
 	writeLog(c, "会议室管理", "修改", "修改会议室："+req.Name)
 }
 
+// DeleteMeetingRoom 删除数据
 func DeleteMeetingRoom(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

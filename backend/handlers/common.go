@@ -58,6 +58,7 @@ func ValidateFormat(c *gin.Context) {
 	}
 }
 
+// parseID 解析输入数据
 func parseID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
@@ -74,6 +75,7 @@ type PageResult struct {
 	PageSize int         `json:"page_size"`
 }
 
+// getPagination 获取数据
 func getPagination(c *gin.Context) (page, pageSize, offset int) {
 	page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))

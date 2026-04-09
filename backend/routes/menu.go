@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// menuRoutes 执行相关业务逻辑
 func menuRoutes(rg *gin.RouterGroup) {
 	rg.GET("/menus", handlers.GetMenus)
 	rg.GET("/menus/:id", handlers.GetMenu)

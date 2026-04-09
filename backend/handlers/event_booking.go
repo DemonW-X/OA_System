@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetEventBookings 获取数据
 func GetEventBookings(c *gin.Context) {
 	var list []models.EventBooking
 	query := database.DB.Model(&models.EventBooking{}).Preload("MeetingRoom")
@@ -33,6 +34,7 @@ func GetEventBookings(c *gin.Context) {
 	writeLog(c, "事件预定", "查询", "查询事件预定列表")
 }
 
+// GetEventBooking 获取数据
 func GetEventBooking(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -46,6 +48,7 @@ func GetEventBooking(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": booking})
 }
 
+// CreateEventBooking 创建数据
 func CreateEventBooking(c *gin.Context) {
 	var req dto.EventBookingRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -102,6 +105,7 @@ func CreateEventBooking(c *gin.Context) {
 	writeLog(c, "事件预定", "新增", "新增预定："+req.Title)
 }
 
+// UpdateEventBooking 更新数据
 func UpdateEventBooking(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -161,6 +165,7 @@ func UpdateEventBooking(c *gin.Context) {
 	writeLog(c, "事件预定", "修改", "修改预定："+req.Title)
 }
 
+// SubmitEventBooking 提交业务处理
 func SubmitEventBooking(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -197,6 +202,7 @@ func SubmitEventBooking(c *gin.Context) {
 	writeLog(c, "事件预定", "提交", "提交预定："+booking.Title)
 }
 
+// ApproveEventBooking 处理审批业务
 func ApproveEventBooking(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -243,6 +249,7 @@ func ApproveEventBooking(c *gin.Context) {
 	writeLog(c, "事件预定", "审批", action+"："+booking.Title)
 }
 
+// DeleteEventBooking 删除数据
 func DeleteEventBooking(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

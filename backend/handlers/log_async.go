@@ -43,6 +43,7 @@ var (
 	operationLogMQEnabled bool
 )
 
+// InitOperationLogAsync 初始化相关资源
 func InitOperationLogAsync() {
 	if !initOperationLogPublisher() {
 		log.Printf("[operation_log] rabbitmq unavailable, fallback to sync db logging")
@@ -53,6 +54,7 @@ func InitOperationLogAsync() {
 	go consumeOperationLogQueue()
 }
 
+// enqueueOperationLog 执行相关业务逻辑
 func enqueueOperationLog(entry models.OperationLog) bool {
 	if !operationLogMQEnabled {
 		return false
@@ -87,6 +89,7 @@ func enqueueOperationLog(entry models.OperationLog) bool {
 	return publishToRabbit(body)
 }
 
+// initOperationLogPublisher 初始化相关资源
 func initOperationLogPublisher() bool {
 	conn, ch, err := openRabbitPublisher()
 	if err != nil {
@@ -108,6 +111,7 @@ func initOperationLogPublisher() bool {
 	return true
 }
 
+// openRabbitPublisher 执行相关业务逻辑
 func openRabbitPublisher() (*amqp.Connection, *amqp.Channel, error) {
 	conn, err := amqp.Dial(operationLogMQURL)
 	if err != nil {
@@ -137,6 +141,7 @@ func openRabbitPublisher() (*amqp.Connection, *amqp.Channel, error) {
 	return conn, ch, nil
 }
 
+// publishToRabbit 执行相关业务逻辑
 func publishToRabbit(body []byte) bool {
 	publisherMu.RLock()
 	ch := publisherCh
@@ -165,6 +170,7 @@ func publishToRabbit(body []byte) bool {
 	return true
 }
 
+// consumeOperationLogQueue 执行相关业务逻辑
 func consumeOperationLogQueue() {
 	for {
 		conn, ch, deliveries, err := openRabbitConsumer()
@@ -195,6 +201,7 @@ func consumeOperationLogQueue() {
 	}
 }
 
+// openRabbitConsumer 执行相关业务逻辑
 func openRabbitConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery, error) {
 	conn, err := amqp.Dial(operationLogMQURL)
 	if err != nil {
@@ -245,6 +252,7 @@ func openRabbitConsumer() (*amqp.Connection, *amqp.Channel, <-chan amqp.Delivery
 	return conn, ch, deliveries, nil
 }
 
+// decodeOperationLogMessage 执行相关业务逻辑
 func decodeOperationLogMessage(body []byte) (models.OperationLog, bool) {
 	var msg operationLogMessage
 	if err := json.Unmarshal(body, &msg); err != nil {
@@ -272,6 +280,7 @@ func decodeOperationLogMessage(body []byte) (models.OperationLog, bool) {
 	return entry, true
 }
 
+// getenv 获取数据
 func getenv(key, fallback string) string {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {

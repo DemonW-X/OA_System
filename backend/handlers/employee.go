@@ -18,6 +18,7 @@ var (
 	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 )
 
+// parseDateOnly 解析输入数据
 func parseDateOnly(value string) (*time.Time, error) {
 	text := strings.TrimSpace(value)
 	if text == "" {
@@ -30,6 +31,16 @@ func parseDateOnly(value string) (*time.Time, error) {
 	return &t, nil
 }
 
+// calculateProbationEnd 计算试用截止日期
+func calculateProbationEnd(onboardDate *time.Time, probationMonths int) *time.Time {
+	if onboardDate == nil || probationMonths <= 0 {
+		return nil
+	}
+	result := onboardDate.AddDate(0, probationMonths, 0)
+	return &result
+}
+
+// validateEmployee 校验输入或状态
 func validateEmployee(phone, email string) (string, bool) {
 	if phone != "" && !phoneRegex.MatchString(phone) {
 		return "手机号格式不正确", false
@@ -40,6 +51,47 @@ func validateEmployee(phone, email string) (string, bool) {
 	return "", true
 }
 
+// validateEmployeeDepartmentPosition 校验输入或状态
+func validateEmployeeDepartmentPosition(departmentID, positionID int) (string, bool) {
+	if departmentID <= 0 {
+		return "请选择有效部门", false
+	}
+	if positionID <= 0 {
+		return "请选择有效职位", false
+	}
+
+	var deptCount int64
+	database.DB.Model(&models.Department{}).Where("id = ?", departmentID).Count(&deptCount)
+	if deptCount == 0 {
+		return "部门不存在", false
+	}
+
+	var posCount int64
+	database.DB.Model(&models.Position{}).Where("id = ?", positionID).Count(&posCount)
+	if posCount == 0 {
+		return "职位不存在", false
+	}
+
+	return "", true
+}
+
+// normalizeEmployeeStatusForCreate 执行相关业务逻辑
+func normalizeEmployeeStatusForCreate(status int) int {
+	if status == 0 || status == 1 || status == 2 {
+		return status
+	}
+	return 1
+}
+
+// normalizeEmployeeStatusForUpdate 执行相关业务逻辑
+func normalizeEmployeeStatusForUpdate(status, fallback int) int {
+	if status == 0 || status == 1 || status == 2 {
+		return status
+	}
+	return fallback
+}
+
+// GetEmployees 获取数据
 func GetEmployees(c *gin.Context) {
 	nameOnly := c.Query("name_only") == "1"
 	if nameOnly {
@@ -58,6 +110,9 @@ func GetEmployees(c *gin.Context) {
 		}
 		if posID := c.Query("position_id"); posID != "" {
 			query = query.Where("position_id = ?", posID)
+		}
+		if approveStatus := c.Query("approve_status"); approveStatus != "" {
+			query = query.Where("approve_status = ?", approveStatus)
 		}
 		if status := c.Query("status"); status != "" {
 			query = query.Where("status = ?", status)
@@ -90,6 +145,9 @@ func GetEmployees(c *gin.Context) {
 	if posID := c.Query("position_id"); posID != "" {
 		query = query.Where("position_id = ?", posID)
 	}
+	if approveStatus := c.Query("approve_status"); approveStatus != "" {
+		query = query.Where("approve_status = ?", approveStatus)
+	}
 	if status := c.Query("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -104,6 +162,7 @@ func GetEmployees(c *gin.Context) {
 	writeLog(c, "员工管理", "查询", "查询员工列表")
 }
 
+// GetEmployee 获取数据
 func GetEmployee(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -118,6 +177,7 @@ func GetEmployee(c *gin.Context) {
 	writeLog(c, "员工管理", "查询", "查询员工详情")
 }
 
+// CreateEmployee 创建数据
 func CreateEmployee(c *gin.Context) {
 	var req dto.EmployeeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -132,6 +192,10 @@ func CreateEmployee(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "手机号不能为空，将作为登录账号"})
 		return
 	}
+	if msg, ok := validateEmployeeDepartmentPosition(req.DepartmentID, req.PositionID); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": msg})
+		return
+	}
 
 	var existCount int64
 	database.DB.Model(&models.User{}).Where("username = ?", req.Phone).Count(&existCount)
@@ -143,11 +207,6 @@ func CreateEmployee(c *gin.Context) {
 	onboardDate, err := parseDateOnly(req.OnboardDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "onboard_date 格式应为 YYYY-MM-DD"})
-		return
-	}
-	probationEnd, err := parseDateOnly(req.ProbationEnd)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "probation_end 格式应为 YYYY-MM-DD"})
 		return
 	}
 
@@ -178,7 +237,6 @@ func CreateEmployee(c *gin.Context) {
 		OnboardDate:    onboardDate,
 		OnboardType:    req.OnboardType,
 		ProbationDays:  req.ProbationDays,
-		ProbationEnd:   probationEnd,
 		IDCard:         req.IDCard,
 		NativePlace:    req.NativePlace,
 		Address:        req.Address,
@@ -191,18 +249,16 @@ func CreateEmployee(c *gin.Context) {
 		Remark:         req.Remark,
 		DepartmentID:   req.DepartmentID,
 		PositionID:     req.PositionID,
-		Status:         req.Status,
+		Status:         normalizeEmployeeStatusForCreate(req.Status),
 		UserID:         user.ID,
 	}
 	if emp.OnboardType == "" {
 		emp.OnboardType = "new"
 	}
 	if emp.ProbationDays <= 0 {
-		emp.ProbationDays = 90
+		emp.ProbationDays = 3
 	}
-	if emp.Status == 0 {
-		emp.Status = 1
-	}
+	emp.ProbationEnd = calculateProbationEnd(emp.OnboardDate, emp.ProbationDays)
 	if err := tx.Create(&emp).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建员工失败: " + err.Error()})
@@ -217,6 +273,7 @@ func CreateEmployee(c *gin.Context) {
 	writeLog(c, "员工管理", "新增", "新增员工："+req.Name)
 }
 
+// UpdateEmployee 更新数据
 func UpdateEmployee(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -237,14 +294,22 @@ func UpdateEmployee(c *gin.Context) {
 		return
 	}
 
+	departmentID := req.DepartmentID
+	if departmentID <= 0 {
+		departmentID = emp.DepartmentID
+	}
+	positionID := req.PositionID
+	if positionID <= 0 {
+		positionID = emp.PositionID
+	}
+	if msg, ok := validateEmployeeDepartmentPosition(departmentID, positionID); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": msg})
+		return
+	}
+
 	onboardDate, err := parseDateOnly(req.OnboardDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "onboard_date 格式应为 YYYY-MM-DD"})
-		return
-	}
-	probationEnd, err := parseDateOnly(req.ProbationEnd)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "probation_end 格式应为 YYYY-MM-DD"})
 		return
 	}
 
@@ -265,7 +330,6 @@ func UpdateEmployee(c *gin.Context) {
 	emp.OnboardDate = onboardDate
 	emp.OnboardType = req.OnboardType
 	emp.ProbationDays = req.ProbationDays
-	emp.ProbationEnd = probationEnd
 	emp.IDCard = req.IDCard
 	emp.NativePlace = req.NativePlace
 	emp.Address = req.Address
@@ -276,15 +340,16 @@ func UpdateEmployee(c *gin.Context) {
 	emp.Major = req.Major
 	emp.WorkYears = req.WorkYears
 	emp.Remark = req.Remark
-	emp.DepartmentID = req.DepartmentID
-	emp.PositionID = req.PositionID
-	emp.Status = req.Status
+	emp.DepartmentID = departmentID
+	emp.PositionID = positionID
+	emp.Status = normalizeEmployeeStatusForUpdate(req.Status, emp.Status)
 	if emp.OnboardType == "" {
 		emp.OnboardType = "new"
 	}
 	if emp.ProbationDays <= 0 {
-		emp.ProbationDays = 90
+		emp.ProbationDays = 3
 	}
+	emp.ProbationEnd = calculateProbationEnd(emp.OnboardDate, emp.ProbationDays)
 	if err := tx.Save(&emp).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败"})
@@ -299,6 +364,7 @@ func UpdateEmployee(c *gin.Context) {
 	writeLog(c, "员工管理", "修改", "修改员工："+req.Name)
 }
 
+// DeleteEmployee 删除数据
 func DeleteEmployee(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

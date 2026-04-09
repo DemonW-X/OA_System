@@ -42,7 +42,7 @@ type OrchidWorkflowTask struct {
 	InstanceID int        `json:"instance_id" gorm:"index"`
 	NodeKey    string     `json:"node_key" gorm:"index"`
 	AssigneeID int        `json:"assignee_id" gorm:"index"`
-	Status     string     `json:"status" gorm:"default:'open'"` // open/done/transferred/skipped
+	Status     string     `json:"status" gorm:"default:'open'"`       // open/done/transferred/skipped
 	TaskType   string     `json:"task_type" gorm:"default:'approve'"` // approve/read
 	ReadAt     *time.Time `json:"read_at"`
 	CreatedAt  time.Time  `json:"created_at"`

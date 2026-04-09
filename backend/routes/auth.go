@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// authRoutes 执行相关业务逻辑
 func authRoutes(rg *gin.RouterGroup) {
 	rg.GET("/profile", handlers.GetProfile)
 	rg.PUT("/profile", handlers.UpdateProfile)

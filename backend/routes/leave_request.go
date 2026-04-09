@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// leaveRequestRoutes 执行相关业务逻辑
 func leaveRequestRoutes(rg *gin.RouterGroup) {
 	rg.GET("/leave-requests", handlers.GetLeaveRequests)
 	rg.GET("/leave-requests/:id", handlers.GetLeaveRequest)

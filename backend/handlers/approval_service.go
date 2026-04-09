@@ -25,6 +25,7 @@ type ApprovalDecisionResult struct {
 	WorkflowLogs  string
 }
 
+// submitApprovalFlow 提交业务处理
 func submitApprovalFlow(bizType string, bizID int, operator string) (*ApprovalSubmitResult, error) {
 	now := time.Now()
 	res := &ApprovalSubmitResult{
@@ -56,6 +57,7 @@ func submitApprovalFlow(bizType string, bizID int, operator string) (*ApprovalSu
 	return res, nil
 }
 
+// approveApprovalFlow 处理审批业务
 func approveApprovalFlow(bizType string, bizID int, operator, action, remark string) (*ApprovalDecisionResult, error) {
 	if action != "approved" && action != "rejected" {
 		return nil, errors.New("action 只能为 approved 或 rejected")
@@ -74,6 +76,7 @@ func approveApprovalFlow(bizType string, bizID int, operator, action, remark str
 	}, nil
 }
 
+// withdrawApprovalFlow 执行撤回处理
 func withdrawApprovalFlow(bizType string, bizID int, operator string) error {
 	ins, err := getInstanceByBiz(bizType, bizID)
 	if err != nil {

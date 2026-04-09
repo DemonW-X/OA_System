@@ -20,12 +20,14 @@ var (
 	pwdMinLen    = regexp.MustCompile(`^.{8,}$`)
 )
 
+// isValidPassword 校验输入或状态
 func isValidPassword(pwd string) bool {
 	return pwdMinLen.MatchString(pwd) &&
 		pwdHasLetter.MatchString(pwd) &&
 		pwdHasDigit.MatchString(pwd)
 }
 
+// Login 执行相关业务逻辑
 func Login(c *gin.Context) {
 	var req dto.AuthLoginRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,12 +59,14 @@ func Login(c *gin.Context) {
 	})
 }
 
+// Logout 执行相关业务逻辑
 func Logout(c *gin.Context) {
 	userID := c.GetInt("userID")
 	middleware.DeleteToken(userID)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "已登出"})
 }
 
+// GetProfile 获取数据
 func GetProfile(c *gin.Context) {
 	userID := c.GetInt("userID")
 	var user models.User
@@ -73,6 +77,7 @@ func GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": user})
 }
 
+// UpdateProfile 更新数据
 func UpdateProfile(c *gin.Context) {
 	userID := c.GetInt("userID")
 	var user models.User
@@ -100,6 +105,7 @@ func UpdateProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": user, "msg": "更新成功"})
 }
 
+// ChangePassword 执行相关业务逻辑
 func ChangePassword(c *gin.Context) {
 	userID := c.GetInt("userID")
 	var user models.User
@@ -139,6 +145,7 @@ func ChangePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "密码修改成功"})
 }
 
+// InitAdmin 初始化相关资源
 func InitAdmin() {
 	var count int64
 	database.DB.Model(&models.User{}).Count(&count)

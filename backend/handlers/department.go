@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// calcDepartmentLevel 执行相关业务逻辑
 func calcDepartmentLevel(parentID *int) (int, error) {
 	if parentID == nil {
 		return 1, nil
@@ -20,6 +21,7 @@ func calcDepartmentLevel(parentID *int) (int, error) {
 	return parent.Level + 1, nil
 }
 
+// hasDepartmentCycle 校验输入或状态
 func hasDepartmentCycle(currentID int, parentID *int) bool {
 	if parentID == nil {
 		return false
@@ -46,6 +48,7 @@ func hasDepartmentCycle(currentID int, parentID *int) bool {
 	return false
 }
 
+// updateChildrenDepartmentLevel 更新数据
 func updateChildrenDepartmentLevel(parentID int, parentLevel int) {
 	var children []models.Department
 	database.DB.Where("parent_id = ?", parentID).Find(&children)
@@ -58,6 +61,7 @@ func updateChildrenDepartmentLevel(parentID int, parentLevel int) {
 	}
 }
 
+// GetDepartments 获取数据
 func GetDepartments(c *gin.Context) {
 	var list []models.Department
 	query := database.DB.Model(&models.Department{}).Preload("Parent")
@@ -82,6 +86,7 @@ func GetDepartments(c *gin.Context) {
 	writeLog(c, "部门管理", "查询", "查询部门列表")
 }
 
+// CreateDepartment 创建数据
 func CreateDepartment(c *gin.Context) {
 	var req dto.DepartmentRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -105,6 +110,7 @@ func CreateDepartment(c *gin.Context) {
 	writeLog(c, "部门管理", "新增", "新增部门："+req.Name)
 }
 
+// UpdateDepartment 更新数据
 func UpdateDepartment(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -145,6 +151,7 @@ func UpdateDepartment(c *gin.Context) {
 	writeLog(c, "部门管理", "修改", "修改部门："+req.Name)
 }
 
+// DeleteDepartment 删除数据
 func DeleteDepartment(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

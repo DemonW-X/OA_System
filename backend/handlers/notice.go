@@ -22,6 +22,7 @@ type NoticeRequest = dto.NoticeRequestDTO
 type NoticeSubmitReq = dto.NoticeSubmitRequestDTO
 type NoticeApproveReq = dto.NoticeApproveRequestDTO
 
+// noticeApproveStatusTagToInt 执行相关业务逻辑
 func noticeApproveStatusTagToInt(status string) int {
 	switch status {
 	case "draft":
@@ -37,6 +38,7 @@ func noticeApproveStatusTagToInt(status string) int {
 	}
 }
 
+// noticeStatusIntToApproveTag 执行相关业务逻辑
 func noticeStatusIntToApproveTag(status int) string {
 	switch status {
 	case 0:
@@ -52,6 +54,7 @@ func noticeStatusIntToApproveTag(status int) string {
 	}
 }
 
+// GetNotices 获取数据
 func GetNotices(c *gin.Context) {
 	var list []models.Notice
 	query := database.DB.Model(&models.Notice{}).Preload("Department")
@@ -78,6 +81,7 @@ func GetNotices(c *gin.Context) {
 	writeLog(c, "公告管理", "查询", "查询公告列表")
 }
 
+// GetNotice 获取数据
 func GetNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -92,6 +96,7 @@ func GetNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "查询", "查询公告详情")
 }
 
+// CreateNotice 创建数据
 func CreateNotice(c *gin.Context) {
 	var req NoticeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -120,6 +125,7 @@ func CreateNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "新增", "新增公告："+req.Title)
 }
 
+// UpdateNotice 更新数据
 func UpdateNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -153,6 +159,7 @@ func UpdateNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "修改", "修改公告："+req.Title)
 }
 
+// SubmitNotice 提交业务处理
 func SubmitNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -195,6 +202,7 @@ func SubmitNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "提交", "提交公告审核："+notice.Title)
 }
 
+// ApproveNotice 处理审批业务
 func ApproveNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -236,6 +244,7 @@ func ApproveNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "审批", "审批公告："+notice.Title)
 }
 
+// WithdrawNotice 执行撤回处理
 func WithdrawNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -269,6 +278,7 @@ func WithdrawNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "撤回", "撤回公告审核："+notice.Title)
 }
 
+// CancelApproveNotice 执行取消处理
 func CancelApproveNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -296,6 +306,7 @@ func CancelApproveNotice(c *gin.Context) {
 	writeLog(c, "公告管理", "取消审核", "取消公告审核："+notice.Title)
 }
 
+// DeleteNotice 删除数据
 func DeleteNotice(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

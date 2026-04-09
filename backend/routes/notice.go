@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// noticeRoutes 执行相关业务逻辑
 func noticeRoutes(rg *gin.RouterGroup) {
 	rg.GET("/notices", handlers.GetNotices)
 	rg.GET("/notices/:id", handlers.GetNotice)

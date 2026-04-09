@@ -30,6 +30,7 @@ func InitBizTypes() {
 	}
 }
 
+// contains 执行相关业务逻辑
 func contains(list []string, target string) bool {
 	for _, v := range list {
 		if v == target {
@@ -81,6 +82,7 @@ func DeleteBizType(c *gin.Context) {
 type WorkflowNodeInput = dto.WorkflowNodeInputDTO
 type WorkflowTemplateRequest = dto.WorkflowTemplateRequestDTO
 
+// GetWorkflowTemplates 获取数据
 func GetWorkflowTemplates(c *gin.Context) {
 	var list []models.WorkflowTemplate
 	query := database.DB.Model(&models.WorkflowTemplate{}).Preload("Nodes")
@@ -98,6 +100,7 @@ func GetWorkflowTemplates(c *gin.Context) {
 	writeLog(c, "流程管理", "查询", "查询流程模板列表")
 }
 
+// GetWorkflowTemplate 获取数据
 func GetWorkflowTemplate(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -111,6 +114,7 @@ func GetWorkflowTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": tpl})
 }
 
+// CreateWorkflowTemplate 创建数据
 func CreateWorkflowTemplate(c *gin.Context) {
 	var req WorkflowTemplateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -156,6 +160,7 @@ func CreateWorkflowTemplate(c *gin.Context) {
 	writeLog(c, "流程管理", "新增", "新增流程模板："+req.Name)
 }
 
+// UpdateWorkflowTemplate 更新数据
 func UpdateWorkflowTemplate(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -214,6 +219,7 @@ func UpdateWorkflowTemplate(c *gin.Context) {
 	writeLog(c, "流程管理", "修改", "修改流程模板："+req.Name)
 }
 
+// DeleteWorkflowTemplate 删除数据
 func DeleteWorkflowTemplate(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {

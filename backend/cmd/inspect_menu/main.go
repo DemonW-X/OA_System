@@ -7,6 +7,7 @@ import (
 	"oa-system/models"
 )
 
+// main 程序入口
 func main() {
 	config.Init()
 	database.InitDB()

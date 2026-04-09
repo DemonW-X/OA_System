@@ -31,10 +31,12 @@ type menuPermissionContext struct {
 	positionID   int
 }
 
+// needFilter 执行相关业务逻辑
 func (ctx menuPermissionContext) needFilter() bool {
 	return ctx.scope != menuScopeAdmin
 }
 
+// cacheToken 执行相关业务逻辑
 func (ctx menuPermissionContext) cacheToken() string {
 	switch ctx.scope {
 	case menuScopeAdmin:
@@ -48,10 +50,12 @@ func (ctx menuPermissionContext) cacheToken() string {
 	}
 }
 
+// menuCacheKey 执行相关业务逻辑
 func menuCacheKey(scopeToken string) string {
 	return fmt.Sprintf("menu:tree:scope:%s", scopeToken)
 }
 
+// getMenuTreeCache 获取数据
 func getMenuTreeCache(scopeToken string) []MenuTreeItem {
 	if database.RDB == nil {
 		return nil
@@ -67,6 +71,7 @@ func getMenuTreeCache(scopeToken string) []MenuTreeItem {
 	return items
 }
 
+// setMenuTreeCache 更新数据
 func setMenuTreeCache(scopeToken string, items []MenuTreeItem) {
 	if database.RDB == nil {
 		return
@@ -78,6 +83,7 @@ func setMenuTreeCache(scopeToken string, items []MenuTreeItem) {
 	database.RDB.Set(context.Background(), menuCacheKey(scopeToken), b, menuCacheTTL)
 }
 
+// InvalidateMenuCache 执行相关业务逻辑
 func InvalidateMenuCache(scopeToken string) {
 	if database.RDB == nil {
 		return
@@ -85,6 +91,7 @@ func InvalidateMenuCache(scopeToken string) {
 	database.RDB.Del(context.Background(), menuCacheKey(scopeToken))
 }
 
+// InvalidateAllMenuCache 执行相关业务逻辑
 func InvalidateAllMenuCache() {
 	if database.RDB == nil {
 		return
@@ -97,6 +104,7 @@ func InvalidateAllMenuCache() {
 	database.RDB.Del(ctx, keys...)
 }
 
+// getPositionAssignedMenuIDs 获取数据
 func getPositionAssignedMenuIDs(positionID int) []int {
 	if positionID <= 0 {
 		return []int{}
@@ -113,6 +121,7 @@ func getPositionAssignedMenuIDs(positionID int) []int {
 	return ids
 }
 
+// getDepartmentAssignedMenuIDs 获取数据
 func getDepartmentAssignedMenuIDs(departmentID int) []int {
 	if departmentID <= 0 {
 		return []int{}
@@ -129,6 +138,7 @@ func getDepartmentAssignedMenuIDs(departmentID int) []int {
 	return ids
 }
 
+// getEmployeeAssignedMenuIDs 获取数据
 func getEmployeeAssignedMenuIDs(employeeID int) []int {
 	if employeeID <= 0 {
 		return []int{}
@@ -145,6 +155,7 @@ func getEmployeeAssignedMenuIDs(employeeID int) []int {
 	return ids
 }
 
+// mergeUniqueMenuIDs 执行相关业务逻辑
 func mergeUniqueMenuIDs(groups ...[]int) []int {
 	if len(groups) == 0 {
 		return []int{}
@@ -168,6 +179,7 @@ func mergeUniqueMenuIDs(groups ...[]int) []int {
 	return ids
 }
 
+// includeParentMenuIDs 执行相关业务逻辑
 func includeParentMenuIDs(ids []int) []int {
 	if len(ids) == 0 {
 		return []int{}
@@ -215,6 +227,7 @@ func includeParentMenuIDs(ids []int) []int {
 	return result
 }
 
+// resolveMenuPermissionContext 执行相关业务逻辑
 func resolveMenuPermissionContext(c *gin.Context) menuPermissionContext {
 	if positionIDStr := strings.TrimSpace(c.Query("position_id")); positionIDStr != "" {
 		positionID, err := strconv.Atoi(positionIDStr)
@@ -265,6 +278,7 @@ func resolveMenuPermissionContext(c *gin.Context) menuPermissionContext {
 	}
 }
 
+// getMenuIDsByContext 获取数据
 func getMenuIDsByContext(ctx menuPermissionContext) []int {
 	switch ctx.scope {
 	case menuScopeAdmin:
@@ -295,6 +309,7 @@ func resolveMenuFilterEmployeeID(c *gin.Context) (int, bool) {
 	return ctx.employeeID, true
 }
 
+// applyMenuPermissionScope 执行相关业务逻辑
 func applyMenuPermissionScope(c *gin.Context, query *gorm.DB) (*gorm.DB, bool) {
 	ctx := resolveMenuPermissionContext(c)
 	if !ctx.needFilter() {

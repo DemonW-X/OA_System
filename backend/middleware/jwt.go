@@ -26,10 +26,12 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// redisTokenKey 执行相关业务逻辑
 func redisTokenKey(userID int) string {
 	return fmt.Sprintf("token:%d", userID)
 }
 
+// GenerateToken 生成业务数据
 func GenerateToken(userID int, username, realName, role string) (string, error) {
 	claims := Claims{
 		UserID:   userID,
@@ -51,6 +53,7 @@ func GenerateToken(userID int, username, realName, role string) (string, error) 
 	return tokenStr, nil
 }
 
+// ParseToken 解析输入数据
 func ParseToken(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
@@ -64,10 +67,12 @@ func ParseToken(tokenStr string) (*Claims, error) {
 	return nil, jwt.ErrTokenInvalidClaims
 }
 
+// DeleteToken 删除数据
 func DeleteToken(userID int) {
 	database.RDB.Del(context.Background(), redisTokenKey(userID))
 }
 
+// JWTAuth 执行相关业务逻辑
 func JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")

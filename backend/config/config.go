@@ -18,6 +18,7 @@ type Config struct {
 
 var AppConfig Config
 
+// Init 初始化相关资源
 func Init() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("未找到 .env 文件，使用环境变量")
@@ -33,6 +34,7 @@ func Init() {
 	}
 }
 
+// getEnv 获取数据
 func getEnv(key, fallback string) string {
 	if val := os.Getenv(key); val != "" {
 		return val

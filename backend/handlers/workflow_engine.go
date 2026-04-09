@@ -20,6 +20,7 @@ import (
 
 const workflowTimeout = 10 * time.Second
 
+// instanceLockKey 执行相关业务逻辑
 func instanceLockKey(bizType string, bizID int) string {
 	return fmt.Sprintf("wf_lock:%s:%d", bizType, bizID)
 }
@@ -28,6 +29,7 @@ type dagNodeApproval struct {
 	Approvers []int `json:"approvers"`
 }
 
+// loadOrchidDefinitionByBiz 加载业务数据
 func loadOrchidDefinitionByBiz(bizType string) (*models.OrchidWorkflowDefinition, error) {
 	var def models.OrchidWorkflowDefinition
 	if err := database.DB.Where("biz_type = ? AND is_active = ?", bizType, true).Order("id desc").First(&def).Error; err != nil {
@@ -47,10 +49,12 @@ type dagRaw struct {
 	Edges []dagEdgeRaw `json:"edges"`
 }
 
+// edgeConditionKey 执行相关业务逻辑
 func edgeConditionKey(from, to string) string {
 	return from + "->" + to
 }
 
+// isConditionExpr 校验输入或状态
 func isConditionExpr(s string) bool {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -66,6 +70,7 @@ func isConditionExpr(s string) bool {
 		strings.Contains(s, "||")
 }
 
+// loadOrchidWorkflowByBiz 加载业务数据
 func loadOrchidWorkflowByBiz(bizType string) (*models.OrchidWorkflowDefinition, *orchid.Workflow, map[string]string, error) {
 	def, err := loadOrchidDefinitionByBiz(bizType)
 	if err != nil {
@@ -95,6 +100,7 @@ func loadOrchidWorkflowByBiz(bizType string) (*models.OrchidWorkflowDefinition, 
 	return def, wf, condMap, nil
 }
 
+// hasOrchidWorkflowForBiz 校验输入或状态
 func hasOrchidWorkflowForBiz(bizType string) bool {
 	_, wf, _, err := loadOrchidWorkflowByBiz(bizType)
 	if err != nil {
@@ -103,6 +109,7 @@ func hasOrchidWorkflowForBiz(bizType string) bool {
 	return len(wf.Nodes) > 0
 }
 
+// firstNodeKeys 执行相关业务逻辑
 func firstNodeKeys(wf *orchid.Workflow) []string {
 	incoming := map[string]int{}
 	for key := range wf.Nodes {
@@ -121,6 +128,7 @@ func firstNodeKeys(wf *orchid.Workflow) []string {
 	return res
 }
 
+// isStartLikeNode 校验输入或状态
 func isStartLikeNode(nodeKey string, node *orchid.Node) bool {
 	if node == nil {
 		return false
@@ -143,6 +151,7 @@ func isStartLikeNode(nodeKey string, node *orchid.Node) bool {
 	return false
 }
 
+// isEndLikeNode 校验输入或状态
 func isEndLikeNode(nodeKey string, node *orchid.Node) bool {
 	if node == nil {
 		return false
@@ -165,6 +174,7 @@ func isEndLikeNode(nodeKey string, node *orchid.Node) bool {
 	return false
 }
 
+// nextNodeKeys 执行相关业务逻辑
 func nextNodeKeys(wf *orchid.Workflow, nodeKey string) []string {
 	res := []string{}
 	for _, e := range wf.Edges {
@@ -175,6 +185,7 @@ func nextNodeKeys(wf *orchid.Workflow, nodeKey string) []string {
 	return res
 }
 
+// getEdgeCondition 获取数据
 func getEdgeCondition(e *orchid.Edge) string {
 	if e == nil {
 		return ""
@@ -185,6 +196,7 @@ func getEdgeCondition(e *orchid.Edge) string {
 	return ""
 }
 
+// nextNodeKeysWithCondition 执行相关业务逻辑
 func nextNodeKeysWithCondition(wf *orchid.Workflow, nodeKey string, bizContext map[string]interface{}, condMap map[string]string) []string {
 	type edgeInfo struct {
 		to        string
@@ -234,6 +246,7 @@ func nextNodeKeysWithCondition(wf *orchid.Workflow, nodeKey string, bizContext m
 	return res
 }
 
+// evalCondition 执行相关业务逻辑
 func evalCondition(condition string, ctx map[string]interface{}) bool {
 	if strings.TrimSpace(condition) == "" || ctx == nil {
 		return true
@@ -265,6 +278,7 @@ func evalCondition(condition string, ctx map[string]interface{}) bool {
 	return evalAtomicCondition(condition, ctx)
 }
 
+// splitByToken 执行相关业务逻辑
 func splitByToken(s, token string) []string {
 	parts := strings.Split(s, token)
 	res := make([]string, 0, len(parts))
@@ -280,6 +294,7 @@ func splitByToken(s, token string) []string {
 	return res
 }
 
+// trimQuote 执行相关业务逻辑
 func trimQuote(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.Trim(s, "\"")
@@ -287,6 +302,7 @@ func trimQuote(s string) string {
 	return s
 }
 
+// toFloat 执行相关业务逻辑
 func toFloat(v interface{}) (float64, bool) {
 	s := strings.TrimSpace(fmt.Sprintf("%v", v))
 	if s == "" {
@@ -299,6 +315,7 @@ func toFloat(v interface{}) (float64, bool) {
 	return f, true
 }
 
+// evalAtomicCondition 执行相关业务逻辑
 func evalAtomicCondition(condition string, ctx map[string]interface{}) bool {
 	condition = strings.TrimSpace(condition)
 	ops := []string{"<=", ">=", "!=", "!~", "~", "=", ":", ">", "<"}
@@ -343,6 +360,7 @@ func evalAtomicCondition(condition string, ctx map[string]interface{}) bool {
 	return true
 }
 
+// loadBizContext 加载业务数据
 func loadBizContext(bizType string, bizID int) map[string]interface{} {
 	ctx := map[string]interface{}{}
 
@@ -389,6 +407,7 @@ func loadBizContext(bizType string, bizID int) map[string]interface{} {
 	return ctx
 }
 
+// resolveAssigneeUserIDs 执行相关业务逻辑
 func resolveAssigneeUserIDs(node *orchid.Node) []int {
 	userIDs := []int{}
 	seen := map[int]bool{}
@@ -426,6 +445,7 @@ func resolveAssigneeUserIDs(node *orchid.Node) []int {
 	return userIDs
 }
 
+// createTasksForNode 创建数据
 func createTasksForNode(insID int, wf *orchid.Workflow, nodeKey string) {
 	node := wf.Nodes[nodeKey]
 	if node == nil {
@@ -466,6 +486,7 @@ func createTasksForNode(insID int, wf *orchid.Workflow, nodeKey string) {
 	}
 }
 
+// startOrchidInstance 启动处理流程
 func startOrchidInstance(bizType string, bizID int, operator string) (*models.OrchidWorkflowInstance, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), workflowTimeout)
 	defer cancel()
@@ -611,6 +632,7 @@ func startOrchidInstance(bizType string, bizID int, operator string) (*models.Or
 	return &ins, nil
 }
 
+// getInstanceByBiz 获取数据
 func getInstanceByBiz(bizType string, bizID int) (*models.OrchidWorkflowInstance, error) {
 	var ins models.OrchidWorkflowInstance
 	if err := database.DB.Where("biz_type = ? AND biz_id = ?", bizType, bizID).Order("id desc").First(&ins).Error; err != nil {
@@ -619,6 +641,7 @@ func getInstanceByBiz(bizType string, bizID int) (*models.OrchidWorkflowInstance
 	return &ins, nil
 }
 
+// closeNodeTasks 执行相关业务逻辑
 func closeNodeTasks(insID int, nodeKey string, assigneeID int, status string) {
 	q := database.DB.Model(&models.OrchidWorkflowTask{}).Where("instance_id = ? AND node_key = ? AND status = 'open'", insID, nodeKey)
 	if assigneeID > 0 {
@@ -627,12 +650,14 @@ func closeNodeTasks(insID int, nodeKey string, assigneeID int, status string) {
 	_ = q.Update("status", status).Error
 }
 
+// openTaskCount 执行相关业务逻辑
 func openTaskCount(insID int, nodeKey string) int64 {
 	var c int64
 	database.DB.Model(&models.OrchidWorkflowTask{}).Where("instance_id = ? AND node_key = ? AND status = 'open'", insID, nodeKey).Count(&c)
 	return c
 }
 
+// parseCurrentNodes 解析输入数据
 func parseCurrentNodes(current string) []string {
 	nodes := []string{}
 	if strings.TrimSpace(current) == "" {
@@ -651,6 +676,7 @@ func parseCurrentNodes(current string) []string {
 	return nodes
 }
 
+// approveOrRejectInstance 处理审批业务
 func approveOrRejectInstance(bizType string, bizID int, operator, action, remark string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), workflowTimeout)
 	defer cancel()
@@ -797,6 +823,7 @@ func approveOrRejectInstance(bizType string, bizID int, operator, action, remark
 	return "pending", nil
 }
 
+// transferTaskForInstance 执行相关业务逻辑
 func transferTaskForInstance(bizType string, bizID int, fromUserID, toUserID int, operator, remark string) error {
 	ins, err := getInstanceByBiz(bizType, bizID)
 	if err != nil {
@@ -816,6 +843,7 @@ func transferTaskForInstance(bizType string, bizID int, fromUserID, toUserID int
 	return database.DB.Create(&models.OrchidWorkflowHistory{InstanceID: ins.ID, NodeKey: task.NodeKey, Action: "transfer", Operator: operator, Remark: remark}).Error
 }
 
+// skipCurrentNodeForInstance 执行相关业务逻辑
 func skipCurrentNodeForInstance(bizType string, bizID int, operator, remark string) error {
 	ins, err := getInstanceByBiz(bizType, bizID)
 	if err != nil {
@@ -847,6 +875,7 @@ func skipCurrentNodeForInstance(bizType string, bizID int, operator, remark stri
 	return err
 }
 
+// getOpenTasksForBiz 获取数据
 func getOpenTasksForBiz(bizType string, bizID int) []models.OrchidWorkflowTask {
 	ins, err := getInstanceByBiz(bizType, bizID)
 	if err != nil {
@@ -857,6 +886,7 @@ func getOpenTasksForBiz(bizType string, bizID int) []models.OrchidWorkflowTask {
 	return tasks
 }
 
+// buildBizWorkflowLogs 构建业务数据
 func buildBizWorkflowLogs(bizType string, bizID int) string {
 	ins, err := getInstanceByBiz(bizType, bizID)
 	if err != nil {

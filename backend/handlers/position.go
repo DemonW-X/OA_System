@@ -15,6 +15,7 @@ type PositionRequest = dto.PositionRequestDTO
 type PositionMenuPermissionRequest = dto.PositionMenuPermissionRequestDTO
 type PositionEmployeeRelationRequest = dto.PositionEmployeeRelationRequestDTO
 
+// GetPositions 获取数据
 func GetPositions(c *gin.Context) {
 	var list []models.Position
 	query := database.DB.Model(&models.Position{})
@@ -60,6 +61,7 @@ func GetPositions(c *gin.Context) {
 	writeLog(c, "职位管理", "查询", "查询职位列表")
 }
 
+// GetPosition 获取数据
 func GetPosition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -86,6 +88,7 @@ func GetPosition(c *gin.Context) {
 	writeLog(c, "职位管理", "查询", "查询职位详情")
 }
 
+// CreatePosition 创建数据
 func CreatePosition(c *gin.Context) {
 	var req PositionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -132,6 +135,7 @@ func CreatePosition(c *gin.Context) {
 	writeLog(c, "职位管理", "新增", "新增职位："+req.Name)
 }
 
+// UpdatePosition 更新数据
 func UpdatePosition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -190,6 +194,7 @@ func UpdatePosition(c *gin.Context) {
 	writeLog(c, "职位管理", "修改", "修改职位："+req.Name)
 }
 
+// DeletePosition 删除数据
 func DeletePosition(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -219,6 +224,7 @@ func DeletePosition(c *gin.Context) {
 	writeLog(c, "职位管理", "删除", "删除职位："+pos.Name)
 }
 
+// SetPositionEmployees 更新数据
 func SetPositionEmployees(c *gin.Context) {
 	positionID, ok := parseID(c)
 	if !ok {
@@ -316,6 +322,7 @@ func SetPositionEmployees(c *gin.Context) {
 	writeLog(c, "角色管理", "人员关联", "设置角色人员关联："+pos.Name)
 }
 
+// GetPositionMenuPermissions 获取数据
 func GetPositionMenuPermissions(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "无权限"})
@@ -351,6 +358,7 @@ func GetPositionMenuPermissions(c *gin.Context) {
 	}})
 }
 
+// SetPositionMenuPermissions 更新数据
 func SetPositionMenuPermissions(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "无权限"})

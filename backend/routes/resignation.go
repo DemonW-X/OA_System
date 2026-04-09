@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// resignationRoutes 执行相关业务逻辑
 func resignationRoutes(rg *gin.RouterGroup) {
 	rg.GET("/resignations", handlers.GetResignations)
 	rg.GET("/resignations/:id", handlers.GetResignation)

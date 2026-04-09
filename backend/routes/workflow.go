@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// workflowRoutes 执行相关业务逻辑
 func workflowRoutes(rg *gin.RouterGroup) {
 	rg.GET("/workflows", handlers.GetWorkflowTemplates)
 	rg.GET("/workflows/:id", handlers.GetWorkflowTemplate)

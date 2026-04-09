@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// writeLog 执行相关业务逻辑
 func writeLog(c *gin.Context, module, action, remark string) {
 	entry := models.OperationLog{
 		UserID:     c.GetInt("userID"),

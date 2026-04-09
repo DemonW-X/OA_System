@@ -12,6 +12,7 @@ import (
 
 const timeLayout = "2006-01-02 15:04:05"
 
+// GetCalendarEvents 获取数据
 func GetCalendarEvents(c *gin.Context) {
 	var list []models.CalendarEvent
 	query := database.DB.Model(&models.CalendarEvent{})
@@ -24,6 +25,7 @@ func GetCalendarEvents(c *gin.Context) {
 	writeLog(c, "行事历", "查询", "查询行事历事件")
 }
 
+// CreateCalendarEvent 创建数据
 func CreateCalendarEvent(c *gin.Context) {
 	var req dto.CalendarEventRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -68,6 +70,7 @@ func CreateCalendarEvent(c *gin.Context) {
 	writeLog(c, "行事历", "新增", "新增事件："+req.Title)
 }
 
+// UpdateCalendarEvent 更新数据
 func UpdateCalendarEvent(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
@@ -110,6 +113,7 @@ func UpdateCalendarEvent(c *gin.Context) {
 	writeLog(c, "行事历", "修改", "修改事件："+req.Title)
 }
 
+// DeleteCalendarEvent 删除数据
 func DeleteCalendarEvent(c *gin.Context) {
 	id, ok := parseID(c)
 	if !ok {
