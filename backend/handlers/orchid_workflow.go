@@ -6,6 +6,7 @@ import (
 	"oa-system/database"
 	"oa-system/dto"
 	"oa-system/models"
+	"oa-system/services"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +72,7 @@ func CreateOrchidWorkflowDefinition(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建失败: " + err.Error()})
 		return
 	}
+	services.RefreshOrchidWorkflowCacheByBizType(def.BizType)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": def})
 	writeLog(c, "流程引擎", "新增", "新增Orchid流程定义："+req.Name)
 }
@@ -86,6 +88,7 @@ func UpdateOrchidWorkflowDefinition(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "流程定义不存在"})
 		return
 	}
+	oldBizType := def.BizType
 	var req OrchidWorkflowDefinitionReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
@@ -104,6 +107,8 @@ func UpdateOrchidWorkflowDefinition(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败"})
 		return
 	}
+	services.RefreshOrchidWorkflowCacheByBizType(oldBizType)
+	services.RefreshOrchidWorkflowCacheByBizType(def.BizType)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": def})
 	writeLog(c, "流程引擎", "修改", "修改Orchid流程定义："+def.Name)
 }
@@ -123,6 +128,7 @@ func DeleteOrchidWorkflowDefinition(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "删除失败"})
 		return
 	}
+	services.RefreshOrchidWorkflowCacheByBizType(def.BizType)
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "删除成功"})
 	writeLog(c, "流程引擎", "删除", "删除Orchid流程定义："+def.Name)
 }
@@ -606,6 +612,7 @@ func SeedOrchidWorkflowTemplates(c *gin.Context) {
 		def := models.OrchidWorkflowDefinition{Name: t.Name, BizType: t.BizType, Description: t.Description, DagJSON: t.DagJSON, IsActive: t.IsActive}
 		if err := database.DB.Create(&def).Error; err == nil {
 			created++
+			services.RefreshOrchidWorkflowCacheByBizType(def.BizType)
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 0, "msg": "导入完成", "data": gin.H{"created": created}})

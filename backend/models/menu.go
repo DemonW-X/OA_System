@@ -7,7 +7,7 @@ import (
 )
 
 // MenuWorkflowConfig menus 与 biz_types 的关联表
-// 有记录即代表该菜单关联了对应的业务类型（启用审批流）
+// 有记录即代表该菜单关联了对应的业务类型（参与审批流业务映射）
 type MenuWorkflowConfig struct {
 	ID        int       `json:"id" gorm:"primaryKey;autoIncrement"`
 	MenuID    int       `json:"menu_id" gorm:"not null;uniqueIndex"` // 关联菜单ID

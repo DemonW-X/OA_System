@@ -14,6 +14,7 @@ import (
 
 	"oa-system/database"
 	"oa-system/models"
+	"oa-system/services"
 
 	"github.com/kyodo-tech/orchid"
 )
@@ -31,11 +32,7 @@ type dagNodeApproval struct {
 
 // loadOrchidDefinitionByBiz 加载业务数据
 func loadOrchidDefinitionByBiz(bizType string) (*models.OrchidWorkflowDefinition, error) {
-	var def models.OrchidWorkflowDefinition
-	if err := database.DB.Where("biz_type = ? AND is_active = ?", bizType, true).Order("id desc").First(&def).Error; err != nil {
-		return nil, err
-	}
-	return &def, nil
+	return services.LoadActiveOrchidWorkflowDefinitionByBiz(bizType)
 }
 
 type dagEdgeRaw struct {

@@ -6,10 +6,11 @@ import (
 )
 
 // syncMenuWorkflowConfig 在新增/编辑菜单时同步 menu_workflow_configs 和 biz_types
-// enableWorkflow=true  → 确保关联存在，biz_types 有对应记录
-// enableWorkflow=false → 删除关联及对应 biz_types 记录
-func syncMenuWorkflowConfig(menuID int, enableWorkflow bool, bizCode, bizName string, bizSort int) {
-	if !enableWorkflow {
+// 规则：
+// biz_code 与 biz_name 均为空  → 删除关联及对应 biz_types
+// biz_code 与 biz_name 均非空  → 确保关联存在并同步 biz_types
+func syncMenuWorkflowConfig(menuID int, bizCode, bizName string, bizSort int) {
+	if bizCode == "" && bizName == "" {
 		DeleteMenuWorkflowConfigByMenuID(menuID)
 		return
 	}

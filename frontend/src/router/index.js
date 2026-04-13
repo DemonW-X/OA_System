@@ -13,6 +13,7 @@ const routes = [
   { path: '/resignation', component: () => import('../views/Resignation.vue'), meta: { requiresAuth: true } },
   { path: '/workflow', component: () => import('../views/Workflow.vue'), meta: { requiresAuth: true } },
   { path: '/menu', component: () => import('../views/Menu.vue'), meta: { requiresAuth: true } },
+  { path: '/dictionary', component: () => import('../views/Dictionary.vue'), meta: { requiresAuth: true } },
   { path: '/schedule', component: () => import('../views/Schedule.vue'), meta: { requiresAuth: true } },
   { path: '/role', component: () => import('../views/Role.vue'), meta: { requiresAuth: true } }
 ]

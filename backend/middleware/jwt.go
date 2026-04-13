@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"oa-system/database"
+	"oa-system/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -99,6 +100,8 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set("username", claims.Username)
 		c.Set("realName", claims.RealName)
 		c.Set("role", claims.Role)
+		// 每次鉴权请求（含页面刷新后的请求）都触发流程缓存预热。
+		services.WarmActiveOrchidWorkflowCacheIfDue(0)
 		c.Next()
 	}
 }

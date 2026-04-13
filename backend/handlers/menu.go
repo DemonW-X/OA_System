@@ -59,7 +59,6 @@ func buildMenuTree(list []models.Menu) []MenuTreeItem {
 				Children: build(m.ID),
 			}
 			if cfg, ok := cfgByMenu[m.ID]; ok {
-				item.EnableWorkflow = true
 				if biz, ok2 := bizByID[cfg.BizTypeID]; ok2 {
 					item.BizCode = biz.Code
 					item.BizName = biz.Name
@@ -156,6 +155,10 @@ func CreateMenu(c *gin.Context) {
 			return
 		}
 	}
+	if (req.BizCode == "" && req.BizName != "") || (req.BizCode != "" && req.BizName == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "业务编码和业务名称需同时填写或同时留空"})
+		return
+	}
 	visible := true
 	if req.Visible != nil {
 		visible = *req.Visible
@@ -174,7 +177,7 @@ func CreateMenu(c *gin.Context) {
 		return
 	}
 	// 同步审批流配置
-	syncMenuWorkflowConfig(m.ID, req.EnableWorkflow, req.BizCode, req.BizName, req.BizSort)
+	syncMenuWorkflowConfig(m.ID, req.BizCode, req.BizName, req.BizSort)
 	InvalidateAllMenuCache()
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 	writeLog(c, "菜单管理", "新增", "新增菜单："+req.Name)
@@ -217,12 +220,16 @@ func UpdateMenu(c *gin.Context) {
 		m.Visible = *req.Visible
 	}
 	m.Remark = req.Remark
+	if (req.BizCode == "" && req.BizName != "") || (req.BizCode != "" && req.BizName == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": "业务编码和业务名称需同时填写或同时留空"})
+		return
+	}
 	if err := database.DB.Save(&m).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败: " + err.Error()})
 		return
 	}
 	// 同步审批流配置
-	syncMenuWorkflowConfig(m.ID, req.EnableWorkflow, req.BizCode, req.BizName, req.BizSort)
+	syncMenuWorkflowConfig(m.ID, req.BizCode, req.BizName, req.BizSort)
 	InvalidateAllMenuCache()
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": m})
 	writeLog(c, "菜单管理", "修改", "修改菜单："+req.Name)

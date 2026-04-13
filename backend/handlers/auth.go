@@ -6,6 +6,7 @@ import (
 	"oa-system/dto"
 	"oa-system/middleware"
 	"oa-system/models"
+	"oa-system/services"
 	"regexp"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,10 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 1, "msg": "用户名或密码错误"})
 		return
 	}
+
+	// 登录成功后立即预热流程定义缓存，避免首次提交流程时冷启动。
+	services.WarmActiveOrchidWorkflowCacheIfDue(0)
+
 	token, err := middleware.GenerateToken(user.ID, user.Username, user.RealName, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "token生成失败"})

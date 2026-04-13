@@ -5,17 +5,11 @@ import (
 	"oa-system/database"
 	"oa-system/dto"
 	"oa-system/models"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
-)
-
-var (
-	phoneRegex = regexp.MustCompile(`^1[3-9]\d{9}$`)
-	emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
 )
 
 // parseDateOnly 解析输入数据
@@ -41,12 +35,15 @@ func calculateProbationEnd(onboardDate *time.Time, probationMonths int) *time.Ti
 }
 
 // validateEmployee 校验输入或状态
-func validateEmployee(phone, email string) (string, bool) {
-	if phone != "" && !phoneRegex.MatchString(phone) {
+func validateEmployee(phone, email, idCard string) (string, bool) {
+	if phone != "" && !phoneRe.MatchString(phone) {
 		return "手机号格式不正确", false
 	}
-	if email != "" && !emailRegex.MatchString(email) {
+	if email != "" && !emailRe.MatchString(email) {
 		return "邮箱格式不正确", false
+	}
+	if idCard != "" && !idCardRe.MatchString(idCard) {
+		return "身份证号格式不正确", false
 	}
 	return "", true
 }
@@ -89,6 +86,56 @@ func normalizeEmployeeStatusForUpdate(status, fallback int) int {
 		return status
 	}
 	return fallback
+}
+
+// deriveEmployeeStatus 执行相关业务逻辑
+func deriveEmployeeStatus(approveStatus string, onboardDate, probationEnd *time.Time, probationMonths int, isResigned bool) int {
+	if isResigned {
+		return 0 // 离职
+	}
+
+	if strings.ToLower(strings.TrimSpace(approveStatus)) != "approved" {
+		return 3 // 待职
+	}
+
+	end := probationEnd
+	if end == nil && onboardDate != nil {
+		months := probationMonths
+		if months <= 0 {
+			months = 3
+		}
+		calculated := onboardDate.AddDate(0, months, 0)
+		end = &calculated
+	}
+	if end == nil {
+		return 1 // 无法计算试用截止日期时默认在职
+	}
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	endDay := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, time.Local)
+	if today.Before(endDay) {
+		return 2 // 试用
+	}
+	return 1 // 在职
+}
+
+// getResignedEmployeeMap 执行相关业务逻辑
+func getResignedEmployeeMap(employeeIDs []int) map[int]struct{} {
+	result := make(map[int]struct{})
+	if len(employeeIDs) == 0 {
+		return result
+	}
+
+	var resignedIDs []int
+	_ = database.DB.Model(&models.Resignation{}).
+		Where("employee_id IN ? AND approve_status = ?", employeeIDs, "approved").
+		Distinct("employee_id").
+		Pluck("employee_id", &resignedIDs).Error
+	for _, id := range resignedIDs {
+		result[id] = struct{}{}
+	}
+	return result
 }
 
 // GetEmployees 获取数据
@@ -155,6 +202,30 @@ func GetEmployees(c *gin.Context) {
 	query.Count(&total)
 	page, pageSize, offset := getPagination(c)
 	query.Order("id asc").Offset(offset).Limit(pageSize).Find(&list)
+
+	ids := make([]int, 0, len(list))
+	for _, item := range list {
+		ids = append(ids, item.ID)
+	}
+	resignedMap := getResignedEmployeeMap(ids)
+
+	for i := range list {
+		derived := deriveEmployeeStatus(
+			list[i].ApproveStatus,
+			list[i].OnboardDate,
+			list[i].ProbationEnd,
+			list[i].ProbationDays,
+			func() bool {
+				_, ok := resignedMap[list[i].ID]
+				return ok
+			}(),
+		)
+		if list[i].Status != derived {
+			list[i].Status = derived
+			_ = database.DB.Model(&models.Employee{}).Where("id = ?", list[i].ID).Update("status", derived).Error
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"data": gin.H{"list": list, "total": total, "page": page, "page_size": pageSize},
@@ -173,6 +244,15 @@ func GetEmployee(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": 1, "msg": "员工不存在"})
 		return
 	}
+
+	resignedMap := getResignedEmployeeMap([]int{emp.ID})
+	_, isResigned := resignedMap[emp.ID]
+	derived := deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, isResigned)
+	if emp.Status != derived {
+		emp.Status = derived
+		_ = database.DB.Model(&models.Employee{}).Where("id = ?", emp.ID).Update("status", derived).Error
+	}
+
 	c.JSON(http.StatusOK, gin.H{"code": 0, "data": emp})
 	writeLog(c, "员工管理", "查询", "查询员工详情")
 }
@@ -184,7 +264,7 @@ func CreateEmployee(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
 	}
-	if msg, ok := validateEmployee(req.Phone, req.Email); !ok {
+	if msg, ok := validateEmployee(req.Phone, req.Email, req.IDCard); !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": msg})
 		return
 	}
@@ -249,7 +329,7 @@ func CreateEmployee(c *gin.Context) {
 		Remark:         req.Remark,
 		DepartmentID:   req.DepartmentID,
 		PositionID:     req.PositionID,
-		Status:         normalizeEmployeeStatusForCreate(req.Status),
+		Status:         0,
 		UserID:         user.ID,
 	}
 	if emp.OnboardType == "" {
@@ -259,6 +339,7 @@ func CreateEmployee(c *gin.Context) {
 		emp.ProbationDays = 3
 	}
 	emp.ProbationEnd = calculateProbationEnd(emp.OnboardDate, emp.ProbationDays)
+	emp.Status = deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, false)
 	if err := tx.Create(&emp).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "创建员工失败: " + err.Error()})
@@ -289,7 +370,7 @@ func UpdateEmployee(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": err.Error()})
 		return
 	}
-	if msg, ok := validateEmployee(req.Phone, req.Email); !ok {
+	if msg, ok := validateEmployee(req.Phone, req.Email, req.IDCard); !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 1, "msg": msg})
 		return
 	}
@@ -342,7 +423,6 @@ func UpdateEmployee(c *gin.Context) {
 	emp.Remark = req.Remark
 	emp.DepartmentID = departmentID
 	emp.PositionID = positionID
-	emp.Status = normalizeEmployeeStatusForUpdate(req.Status, emp.Status)
 	if emp.OnboardType == "" {
 		emp.OnboardType = "new"
 	}
@@ -350,6 +430,7 @@ func UpdateEmployee(c *gin.Context) {
 		emp.ProbationDays = 3
 	}
 	emp.ProbationEnd = calculateProbationEnd(emp.OnboardDate, emp.ProbationDays)
+	emp.Status = deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, false)
 	if err := tx.Save(&emp).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "更新失败"})
@@ -426,6 +507,7 @@ func SubmitEmployee(c *gin.Context) {
 	emp.ApprovedBy = ret.ApprovedBy
 	emp.ApprovedAt = ret.ApprovedAt
 	emp.ApproveRemark = ret.ApproveRemark
+	emp.Status = deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, false)
 
 	if err := database.DB.Save(&emp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "提交审核失败"})
@@ -461,6 +543,7 @@ func WithdrawEmployee(c *gin.Context) {
 	emp.ApprovedBy = ""
 	emp.ApprovedAt = nil
 	emp.ApproveRemark = ""
+	emp.Status = deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, false)
 	if err := database.DB.Save(&emp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "撤回失败"})
 		return
@@ -502,6 +585,7 @@ func ApproveEmployee(c *gin.Context) {
 	emp.ApprovedBy = ret.ApprovedBy
 	emp.ApprovedAt = ret.ApprovedAt
 	emp.ApproveRemark = ret.ApproveRemark
+	emp.Status = deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, false)
 	if err := database.DB.Save(&emp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "审批失败"})
 		return
@@ -530,10 +614,27 @@ func CancelEmployeeApproval(c *gin.Context) {
 		return
 	}
 
+	// 规则：
+	// 1. 无流程实例：允许撤回（兼容“无流程定义自动通过”的单据）
+	// 2. 有流程实例：仅最终审核人可撤回
+	hasWorkflowInstance := false
+	if ins, err := getInstanceByBiz("employee", emp.ID); err == nil && ins != nil {
+		hasWorkflowInstance = true
+	}
+	if hasWorkflowInstance {
+		op := strings.TrimSpace(currentOperator(c))
+		finalApprover := strings.TrimSpace(emp.ApprovedBy)
+		if op == "" || finalApprover == "" || op != finalApprover {
+			c.JSON(http.StatusForbidden, gin.H{"code": 1, "msg": "仅最终审核人可撤回"})
+			return
+		}
+	}
+
 	emp.ApproveStatus = "draft"
 	emp.ApprovedBy = ""
 	emp.ApprovedAt = nil
 	emp.ApproveRemark = ""
+	emp.Status = deriveEmployeeStatus(emp.ApproveStatus, emp.OnboardDate, emp.ProbationEnd, emp.ProbationDays, false)
 	if err := database.DB.Save(&emp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": "取消审核失败"})
 		return

@@ -42,6 +42,7 @@ func SetupRouter() *gin.Engine {
 	workflowRoutes(api)
 	menuRoutes(api)
 	orchidWorkflowRoutes(api)
+	dictionaryRoutes(api)
 
 	// 文件上传接口
 	api.POST("/upload/image", handlers.UploadImage)

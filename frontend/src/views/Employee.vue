@@ -9,7 +9,7 @@
           <el-option v-for="d in departments" :key="d.id" :label="d.name" :value="d.id" />
         </el-select>
       </el-form-item>
-      <el-form-item label="状态">
+      <el-form-item label="审批状态">
         <el-select v-model="query.approve_status" placeholder="全部" clearable style="width:140px">
           <el-option label="草稿" value="draft" />
           <el-option label="待审批" value="pending" />
@@ -41,7 +41,14 @@
       <el-table-column label="部门">
         <template #default="{ row }">{{ row.department?.name || '-' }}</template>
       </el-table-column>
-      <el-table-column label="状态" width="80">
+      <el-table-column label="人员状态" width="90">
+        <template #default="{ row }">
+          <el-tag :type="employeeStatusTagType(row.status)">
+            {{ employeeStatusLabel(row.status) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="审批状态" width="90">
         <template #default="{ row }">
           <el-tag :type="approveStatusTagType(row.approve_status)">
             {{ approveStatusLabel(row.approve_status) }}
@@ -80,7 +87,7 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="ID">{{ detailData.id || '-' }}</el-descriptions-item>
           <el-descriptions-item label="姓名">{{ detailData.name || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="电话">{{ detailData.phone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="电话">{{ maskPhone(detailData.phone) }}</el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ detailData.email || '-' }}</el-descriptions-item>
           <el-descriptions-item label="部门">{{ detailData.department?.name || '-' }}</el-descriptions-item>
           <el-descriptions-item label="职位">{{ detailData.position_info?.name || '-' }}</el-descriptions-item>
@@ -92,7 +99,7 @@
         <el-divider content-position="left">个人信息</el-divider>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="试用截止日期">{{ formatDate(detailData.probation_end) }}</el-descriptions-item>
-          <el-descriptions-item label="身份证号">{{ detailData.id_card || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="身份证号">{{ maskIDCard(detailData.id_card) }}</el-descriptions-item>
           <el-descriptions-item label="籍贯">{{ detailData.native_place || '-' }}</el-descriptions-item>
           <el-descriptions-item label="现居地址">{{ detailData.address || '-' }}</el-descriptions-item>
           <el-descriptions-item label="紧急联系人">{{ detailData.emergency_name || '-' }}</el-descriptions-item>
@@ -110,6 +117,14 @@
       </template>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button
+          type="warning"
+          :loading="detailWithdrawLoading"
+          :disabled="!canWithdrawDetail || submitLoading || withdrawLoading || createLoading"
+          @click="handleDetailWithdraw"
+        >
+          撤回
+        </el-button>
       </template>
     </el-dialog>
 
@@ -185,7 +200,7 @@
         <el-divider content-position="left">个人信息</el-divider>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="身份证号">
+            <el-form-item label="身份证号" prop="id_card">
               <el-input v-model="createForm.id_card" placeholder="请输入身份证号" />
             </el-form-item>
           </el-col>
@@ -252,6 +267,24 @@
         <el-button type="primary" :loading="createLoading" @click="handleSubmit">
           {{ formMode === 'edit' ? '保存' : '确定' }}
         </el-button>
+        <el-button
+          v-if="formMode === 'edit'"
+          type="success"
+          :loading="submitLoading"
+          :disabled="!canSubmitCurrent || createLoading || withdrawLoading"
+          @click="handleSubmitApproval"
+        >
+          提交
+        </el-button>
+        <el-button
+          v-if="formMode === 'edit'"
+          type="warning"
+          :loading="withdrawLoading"
+          :disabled="!canWithdrawCurrent || createLoading || submitLoading"
+          @click="handleWithdrawApproval"
+        >
+          撤回
+        </el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -260,9 +293,10 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getEmployees, getEmployee, createEmployee, updateEmployee } from '../api/employee'
+import { getEmployees, getEmployee, createEmployee, updateEmployee, submitEmployee, withdrawEmployee, cancelApproveEmployee } from '../api/employee'
 import { getDepartments } from '../api/department'
 import { getPositions } from '../api/position'
+import { validateFormat } from '../utils/validators'
 
 const list = ref([])
 const total = ref(0)
@@ -271,12 +305,20 @@ const positions = ref([])
 
 const detailVisible = ref(false)
 const detailData = ref(null)
+const detailWithdrawLoading = ref(false)
 
 const createVisible = ref(false)
 const createFormRef = ref()
 const createLoading = ref(false)
+const submitLoading = ref(false)
+const withdrawLoading = ref(false)
 const formMode = ref('create')
 const editingId = ref(null)
+const editApproveStatus = ref('draft')
+const editApprovedBy = ref('')
+const editApproveRemark = ref('')
+const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+const currentOperator = String(userInfo?.real_name || userInfo?.username || '').trim()
 
 const query = ref({ name: '', department_id: null, approve_status: '', page: 1, page_size: 10 })
 
@@ -304,9 +346,29 @@ const defaultCreateForm = () => ({
 })
 const createForm = ref(defaultCreateForm())
 
+const remoteFormatRule = (type, emptyMsg) => (rule, value, callback) => {
+  const text = String(value || '').trim()
+  if (!text) {
+    callback(new Error(emptyMsg))
+    return
+  }
+  validateFormat(type, text)
+    .then((data) => {
+      if (data?.valid) {
+        callback()
+      } else {
+        callback(new Error(data?.msg || '格式不正确'))
+      }
+    })
+    .catch(() => {
+      callback(new Error('网络异常，格式校验失败，请稍后重试'))
+    })
+}
+
 const createRules = {
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
+  phone: [{ validator: remoteFormatRule('phone', '请输入手机号'), trigger: 'blur' }],
+  id_card: [{ validator: remoteFormatRule('id_card', '请输入身份证号'), trigger: 'blur' }],
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
   department_id: [{ required: true, message: '请选择部门', trigger: 'change' }],
   position_id: [{ required: true, message: '请选择职位', trigger: 'change' }]
@@ -328,6 +390,24 @@ const approveStatusTagType = (status) => {
   if (key === 'approved') return 'success'
   if (key === 'pending') return 'warning'
   if (key === 'rejected') return 'danger'
+  return 'info'
+}
+
+const employeeStatusLabel = (status) => {
+  const value = Number(status)
+  if (value === 3) return '待职'
+  if (value === 2) return '试用'
+  if (value === 1) return '在职'
+  if (value === 0) return '离职'
+  return '待职'
+}
+
+const employeeStatusTagType = (status) => {
+  const value = Number(status)
+  if (value === 3) return 'info'
+  if (value === 2) return 'warning'
+  if (value === 1) return 'success'
+  if (value === 0) return 'danger'
   return 'info'
 }
 
@@ -358,6 +438,30 @@ const calcProbationEnd = (onboardDate, probationMonths) => {
 }
 
 const calculatedProbationEnd = computed(() => calcProbationEnd(createForm.value.onboard_date, createForm.value.probation_days))
+const isNoWorkflowByRemark = (remark) => String(remark || '').includes('无流程定义')
+const isFinalApprover = (approvedBy) => {
+  const text = String(approvedBy || '').trim()
+  return !!text && !!currentOperator && text === currentOperator
+}
+const canWithdrawByRule = (approveStatus, approvedBy, approveRemark) => {
+  const status = String(approveStatus || '').toLowerCase()
+  if (status !== 'approved') return false
+  if (isNoWorkflowByRemark(approveRemark)) return true
+  return isFinalApprover(approvedBy)
+}
+
+const canSubmitCurrent = computed(() => {
+  const status = String(editApproveStatus.value || '').toLowerCase()
+  return formMode.value === 'edit' && !!editingId.value && (status === 'draft' || status === 'rejected')
+})
+const canWithdrawCurrent = computed(() => {
+  return formMode.value === 'edit' && !!editingId.value &&
+    canWithdrawByRule(editApproveStatus.value, editApprovedBy.value, editApproveRemark.value)
+})
+const canWithdrawDetail = computed(() => {
+  return !!detailData.value?.id &&
+    canWithdrawByRule(detailData.value?.approve_status, detailData.value?.approved_by, detailData.value?.approve_remark)
+})
 
 const toDateValue = (value) => {
   if (!value) return ''
@@ -392,9 +496,13 @@ const handleEdit = async (row) => {
   if (!canEdit(row)) return
   try {
     const res = await getEmployee(row.id)
-    createForm.value = mapEmployeeToForm(res.data?.data || {})
+    const detail = res.data?.data || {}
+    createForm.value = mapEmployeeToForm(detail)
     formMode.value = 'edit'
     editingId.value = row.id
+    editApproveStatus.value = detail?.approve_status || row?.approve_status || 'draft'
+    editApprovedBy.value = detail?.approved_by || ''
+    editApproveRemark.value = detail?.approve_remark || ''
     createVisible.value = true
   } catch {
     ElMessage.error('获取员工详情失败')
@@ -404,6 +512,20 @@ const handleEdit = async (row) => {
 const formatDate = (value) => {
   if (!value) return '-'
   return String(value).slice(0, 10)
+}
+
+const maskPhone = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return '-'
+  if (text.length < 7) return text
+  return `${text.slice(0, 3)}****${text.slice(7)}`
+}
+
+const maskIDCard = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return '-'
+  if (text.length < 14) return text
+  return `${text.slice(0, 6)}********${text.slice(14)}`
 }
 
 const onboardTypeLabel = (type) => ({
@@ -446,10 +568,35 @@ const openDetail = async (id) => {
   detailVisible.value = true
 }
 
+const handleDetailWithdraw = async () => {
+  const id = detailData.value?.id
+  if (!id) return
+  detailWithdrawLoading.value = true
+  try {
+    const status = String(detailData.value?.approve_status || '').toLowerCase()
+    if (status === 'pending') {
+      await withdrawEmployee(id)
+    } else {
+      await cancelApproveEmployee(id)
+    }
+    ElMessage.success('撤回成功')
+    const detailRes = await getEmployee(id)
+    detailData.value = detailRes.data?.data || detailData.value
+    await loadData()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '撤回失败')
+  } finally {
+    detailWithdrawLoading.value = false
+  }
+}
+
 const openCreateDialog = () => {
   createForm.value = defaultCreateForm()
   formMode.value = 'create'
   editingId.value = null
+  editApproveStatus.value = 'draft'
+  editApprovedBy.value = ''
+  editApproveRemark.value = ''
   createVisible.value = true
 }
 
@@ -458,6 +605,9 @@ const resetCreateForm = () => {
   createForm.value = defaultCreateForm()
   formMode.value = 'create'
   editingId.value = null
+  editApproveStatus.value = 'draft'
+  editApprovedBy.value = ''
+  editApproveRemark.value = ''
 }
 
 const handleSubmit = async () => {
@@ -476,7 +626,10 @@ const handleSubmit = async () => {
       position_id: createForm.value.position_id
     }
     if (formMode.value === 'edit' && editingId.value) {
-      await updateEmployee(editingId.value, payload)
+      const res = await updateEmployee(editingId.value, payload)
+      editApproveStatus.value = res.data?.data?.approve_status || editApproveStatus.value
+      editApprovedBy.value = res.data?.data?.approved_by || editApprovedBy.value
+      editApproveRemark.value = res.data?.data?.approve_remark || editApproveRemark.value
       ElMessage.success('保存成功')
     } else {
       await createEmployee(payload)
@@ -492,6 +645,43 @@ const handleSubmit = async () => {
     }
   } finally {
     createLoading.value = false
+  }
+}
+
+const handleSubmitApproval = async () => {
+  if (!editingId.value) return
+  submitLoading.value = true
+  try {
+    const res = await submitEmployee(editingId.value, {})
+    editApproveStatus.value = res.data?.data?.approve_status || 'pending'
+    editApprovedBy.value = res.data?.data?.approved_by || ''
+    editApproveRemark.value = res.data?.data?.approve_remark || ''
+    ElMessage.success('提交成功')
+    await loadData()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '提交失败')
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+const handleWithdrawApproval = async () => {
+  if (!editingId.value) return
+  withdrawLoading.value = true
+  try {
+    const status = String(editApproveStatus.value || '').toLowerCase()
+    const res = status === 'pending'
+      ? await withdrawEmployee(editingId.value)
+      : await cancelApproveEmployee(editingId.value)
+    editApproveStatus.value = res.data?.data?.approve_status || 'draft'
+    editApprovedBy.value = res.data?.data?.approved_by || ''
+    editApproveRemark.value = res.data?.data?.approve_remark || ''
+    ElMessage.success('撤回成功')
+    await loadData()
+  } catch (error) {
+    ElMessage.error(error?.response?.data?.msg || error?.message || '撤回失败')
+  } finally {
+    withdrawLoading.value = false
   }
 }
 

@@ -144,9 +144,12 @@ const routeComponentMap = {
   '/resignation':               () => import('./views/Resignation.vue'),
   '/workflow':                  () => import('./views/Workflow.vue'),
   '/menu':                      () => import('./views/Menu.vue'),
+  '/dictionary':                () => import('./views/Dictionary.vue'),
   '/schedule':                  () => import('./views/Schedule.vue'),
   '/role':                      () => import('./views/Role.vue'),
 }
+
+const extraRouteTitleMap = {}
 
 // 多页签状态
 const openTabs = ref([{ path: '/dashboard', title: '首页' }])
@@ -168,11 +171,12 @@ const onMenuSelect = async (path) => {
   const exists = openTabs.value.find(t => t.path === path)
   if (!exists) {
     // 从菜单树中找标题
-    const title = findMenuTitle(menus.value, path) || path
+    const title = findMenuTitle(menus.value, path) || extraRouteTitleMap[path] || path
     openTabs.value.push({ path, title })
   }
   currentTab.value = path
   await loadComponent(path)
+  if (route.path !== path) router.push(path)
 }
 
 const findMenuTitle = (nodes, path) => {
@@ -187,7 +191,9 @@ const findMenuTitle = (nodes, path) => {
 }
 
 const onTabClick = (tab) => {
-  currentTab.value = tab.props.name
+  const path = tab.props.name
+  currentTab.value = path
+  if (route.path !== path) router.push(path)
 }
 
 const onTabRemove = (path) => {
@@ -195,6 +201,7 @@ const onTabRemove = (path) => {
   openTabs.value.splice(idx, 1)
   if (currentTab.value === path) {
     currentTab.value = openTabs.value[Math.max(0, idx - 1)].path
+    if (route.path !== currentTab.value) router.push(currentTab.value)
   }
   // 清理缓存
   const cache = { ...componentCache.value }
@@ -418,14 +425,27 @@ onMounted(() => {
   syncUserInfo()
   if (route.path !== '/login') {
     loadMenus()
-    // 恢复所有已保存的页签组件
-    openTabs.value.forEach(t => loadComponent(t.path))
+    const initialPath = routeComponentMap[route.path] ? route.path : '/dashboard'
+    if (!openTabs.value.find(t => t.path === initialPath)) {
+      const title = findMenuTitle(menus.value, initialPath) || extraRouteTitleMap[initialPath] || initialPath
+      openTabs.value.push({ path: initialPath, title })
+    }
+    currentTab.value = initialPath
+    loadComponent(initialPath)
   }
 })
 
 watch(() => route.path, (newPath, oldPath) => {
   syncUserInfo()
   if (oldPath === '/login' && newPath !== '/login') loadMenus()
+  if (newPath === '/login') return
+  if (!routeComponentMap[newPath]) return
+  if (!openTabs.value.find(t => t.path === newPath)) {
+    const title = findMenuTitle(menus.value, newPath) || extraRouteTitleMap[newPath] || newPath
+    openTabs.value.push({ path: newPath, title })
+  }
+  currentTab.value = newPath
+  loadComponent(newPath)
 })
 </script>
 
