@@ -21,4 +21,5 @@ func main() {
 	r := routes.SetupRouter()
 	log.Printf("服务启动在 :%s", config.AppConfig.ServerPort)
 	r.Run(":" + config.AppConfig.ServerPort)
+
 }
